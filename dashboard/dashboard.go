@@ -5,6 +5,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type page struct {
@@ -77,6 +78,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.tooSmall = m.width < 20 || m.height < 5
 		return m.withLayout(), nil
+	case tea.ModeReportMsg:
+		if msg.Mode == ansi.ModeUnicodeCore && (msg.Value == ansi.ModeSet || msg.Value == ansi.ModeReset || msg.Value == ansi.ModePermanentlySet) {
+			widthMethod = ansi.GraphemeWidth
+		}
+		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:

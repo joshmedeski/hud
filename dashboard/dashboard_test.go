@@ -345,3 +345,18 @@ sections = [[{ recipe = "sessions" }, { recipe = "sessions", headers = false }]]
 		t.Errorf("click on second line selected row %d, want 1", p.cursor)
 	}
 }
+
+func TestEmojiWidthsMatchTheRenderer(t *testing.T) {
+	p := loadedList(t, Recipe{
+		Command: `echo '[{"icon":"🧑‍🎨","name":"a"},{"icon":"✍️","name":"b"},{"icon":"","name":"c"},{"icon":"🛸","name":"d"}]'`,
+		Columns: []string{"icon", "name"},
+	})
+	for _, line := range strings.Split(p.View(20, 10, false), "\n")[1:] {
+		if w := widthMethod.StringWidth(padWidth(line, 20)); w != 20 {
+			t.Errorf("%q is %d cells wide, want 20", line, w)
+		}
+		if i := strings.IndexAny(line, "abcd"); widthMethod.StringWidth(line[:i]) != 7 {
+			t.Errorf("name column misaligned in %q", line)
+		}
+	}
+}
