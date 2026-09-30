@@ -39,11 +39,11 @@ refresh = 300
 title = "Dashboard"
 sections = [
   [
-    { title = "Sessions", recipe = "sesh", command = "sesh list -t --json", columns = ["Icon", "Attached", "Name", "Alerts"] },
+    { title = "Sessions", recipe = "sesh", command = "sesh list -t --json", columns = ["Attached", "Name", "Alerts"] },
     { title = "Weather", command = "curl -s 'wttr.in?0'", refresh = 300 },
   ],
   [
-    { title = "Config + Zoxide", recipe = "sesh", command = "sesh list -c -z -d --json", columns = ["Icon", "Name"] },
+    { title = "Config + Zoxide", recipe = "sesh", command = "sesh list -c -z -d --json", columns = ["Name"] },
     { title = "Nutiliti/nutiliti", recipe = "nutiliti-worktrees" },
     { title = "joshmedeski/sesh", recipe = "sesh-worktrees" },
   ],
