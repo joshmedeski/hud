@@ -318,7 +318,7 @@ func TestHeaderLabelsAndHiding(t *testing.T) {
 [recipe.sessions]
 command = '''echo '[{"Name":"hud","WindowNames":["a","b"]},{"Name":"sesh"}]' '''
 columns = ["Name", "WindowNames"]
-labels = { WindowNames = "Windows" }
+labels = { Name = "", WindowNames = "Windows" }
 
 [[page]]
 sections = [[{ recipe = "sessions" }, { recipe = "sessions", headers = false }]]
@@ -331,7 +331,7 @@ sections = [[{ recipe = "sessions" }, { recipe = "sessions", headers = false }]]
 	hidden, _ := cfg.resolve(row[1])
 
 	p := loadedList(t, labeled)
-	if got := ansi.Strip(strings.Split(p.View(40, 10, false), "\n")[0]); got != " Name  Windows" {
+	if got := ansi.Strip(strings.Split(p.View(40, 10, false), "\n")[0]); got != "       Windows" {
 		t.Errorf("header = %q", got)
 	}
 

@@ -1,7 +1,6 @@
 package dashboard
 
 import (
-	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,7 +30,10 @@ func newSection(title string, r Recipe) Section {
 		if r.Headers == nil || *r.Headers {
 			headers = make([]string, len(r.Columns))
 			for i, col := range r.Columns {
-				headers[i] = cmp.Or(r.Labels[col], humanize(col))
+				headers[i] = humanize(col)
+				if label, ok := r.Labels[col]; ok {
+					headers[i] = label
+				}
 			}
 		}
 		return &listPane{source: src, headers: headers}
