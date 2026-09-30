@@ -439,7 +439,7 @@ func (p *listPane) View(width, height int, focused bool) string {
 
 func (p *listPane) columnWidths(width int) []int {
 	widths := make([]int, len(p.recipe.Columns))
-	total := 1 + 2*(len(widths)-1)
+	total := 2 + 2*(len(widths)-1)
 	for c := range widths {
 		if p.headers != nil {
 			widths[c] = lipgloss.Width(p.headers[c])

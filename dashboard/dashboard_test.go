@@ -215,7 +215,7 @@ func TestLayout(t *testing.T) {
 		t.Errorf("splitEvenly = %v", got)
 	}
 	widths := []int{5, 5}
-	for x, want := range map[int]int{0: -1, 1: 0, 5: 0, 6: -1, 7: 1, 11: 1, 12: -1} {
+	for x, want := range map[int]int{0: 0, 6: 0, 7: 1, 13: 1, 14: -1} {
 		if got := paneCol(x, widths); got != want {
 			t.Errorf("paneCol(%d) = %d, want %d", x, got, want)
 		}
@@ -398,8 +398,11 @@ sections = [
 			divider = line
 		}
 	}
-	if !strings.HasPrefix(divider, "├─ 2 Bottom") || !strings.Contains(divider, "┤") {
-		t.Errorf("stack divider = %q", divider)
+	if !strings.HasPrefix(divider, "┌─ 2 Bottom") {
+		t.Errorf("stacked pane should open its own box: %q", divider)
+	}
+	if !strings.Contains(lines[0], "┐┌─ 3 Side") {
+		t.Errorf("side-by-side panes should each have their own border: %q", lines[0])
 	}
 
 	press := func(k tea.KeyPressMsg) {
@@ -445,11 +448,11 @@ func TestFitShrinksStackedPaneToContent(t *testing.T) {
 		top  Recipe
 		want []int
 	}{
-		{Recipe{Command: "printf 'a\\nb\\n'", Fit: true}, []int{2, 15}},
-		{Recipe{Command: "printf 'a\\nb\\n'"}, []int{9, 8}},
-		{Recipe{Command: "seq 50", Fit: true}, []int{16, 1}},
+		{Recipe{Command: "printf 'a\\nb\\n'", Fit: true}, []int{2, 14}},
+		{Recipe{Command: "printf 'a\\nb\\n'"}, []int{8, 8}},
+		{Recipe{Command: "seq 50", Fit: true}, []int{15, 1}},
 	} {
-		if got := stackHeights(18, stack(tc.top)); !slices.Equal(got, tc.want) {
+		if got := stackHeights(20, stack(tc.top)); !slices.Equal(got, tc.want) {
 			t.Errorf("%q fit=%v: heights = %v, want %v", tc.top.Command, tc.top.Fit, got, tc.want)
 		}
 	}

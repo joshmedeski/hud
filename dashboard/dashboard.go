@@ -193,16 +193,16 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
 			for _, prev := range cols[:c] {
 				base += len(prev)
 			}
-			line, start := cy-top-1, 0
-			for s, h := range stackHeights(m.rowHeights[r]-2, cols[c]) {
-				if line < start+h || s == len(cols[c])-1 {
+			line, start := cy-top, 0
+			for s, h := range stackHeights(m.rowHeights[r], cols[c]) {
+				if line < start+h+2 || s == len(cols[c])-1 {
 					m.focus = base + s
 					if l, ok := cols[c][s].(*listPane); ok {
-						l.ClickAt(line - start)
+						l.ClickAt(line - start - 1)
 					}
 					return m
 				}
-				start += h + 1
+				start += h + 2
 			}
 			return m
 		}
@@ -212,8 +212,8 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
 	return m
 }
 
-func stackHeights(inner int, panes column) []int {
-	remaining := max(inner-(len(panes)-1), len(panes))
+func stackHeights(height int, panes column) []int {
+	remaining := max(height-2*len(panes), len(panes))
 	heights := make([]int, len(panes))
 	var flex []int
 	fitted := 0
@@ -247,12 +247,12 @@ func paneTotal(cols []column) int {
 }
 
 func paneCol(x int, widths []int) int {
-	cursor := 1
+	cursor := 0
 	for i, w := range widths {
-		if x >= cursor && x < cursor+w {
+		if x >= cursor && x < cursor+w+2 {
 			return i
 		}
-		cursor += w + 1
+		cursor += w + 2
 	}
 	return -1
 }
@@ -349,7 +349,7 @@ func (m Model) withLayout() Model {
 	rows := m.rows()
 	m.rowWidths = make([][]int, len(rows))
 	for r, cols := range rows {
-		m.rowWidths[r] = splitEvenly(max(m.width-len(cols)-1, len(cols)), len(cols))
+		m.rowWidths[r] = splitEvenly(max(m.width-2*len(cols), len(cols)), len(cols))
 	}
 	m.rowHeights = splitEvenly(m.contentHeight, len(rows))
 	return m
@@ -410,7 +410,7 @@ func (m Model) viewPage() string {
 		fc := make([]frameColumn, len(cols))
 		for i, panes := range cols {
 			w := m.rowWidths[r][i]
-			heights := stackHeights(m.rowHeights[r]-2, panes)
+			heights := stackHeights(m.rowHeights[r], panes)
 			fc[i] = frameColumn{width: w, panes: make([]framePane, len(panes))}
 			for s, sec := range panes {
 				focused := m.focus == base

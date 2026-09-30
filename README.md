@@ -9,16 +9,16 @@ This is [`hud.example.toml`](hud.example.toml):
 
 ```
 Dashboard │ Life
-───────────────────────────────────────────────────────────────────
-┌─ 1 Sessions ─────────────────────┬─ 2 Weather ──────────────────┐
-│ Attached  Name                   │Weather report: Houston, TX   │
-│ 1         hud                    │                Cloudy        │
-│ 0         sesh                   │       .--.     +91(96) °F    │
-└──────────────────────────────────┴──────────────────────────────┘
-┌─ 3 Config + Zoxide ──────────────┬─ 4 joshmedeski/sesh ─────────┐
-│ Name                             │ Title                 State  │
-│ second brain                     │ Tmuxifier Support     OPEN   │
-└──────────────────────────────────┴──────────────────────────────┘
+─────────────────────────────────────────────────────────────────
+┌─ 1 Sessions ───────────────────┐┌─ 2 Weather ─────────────────┐
+│ Attached  Name                 ││Weather report: Houston, TX  │
+│ 1         hud                  ││                Cloudy       │
+│ 0         sesh                 ││       .--.     +91(96) °F   │
+└────────────────────────────────┘└─────────────────────────────┘
+┌─ 3 Config + Zoxide ────────────┐┌─ 4 joshmedeski/sesh ────────┐
+│ Name                           ││ Title                 State │
+│ second brain                   ││ Tmuxifier Support     OPEN  │
+└────────────────────────────────┘└─────────────────────────────┘
 tab page │ j/k move │ h/l pane │ enter open │ / filter │ q quit  ? help
 ```
 

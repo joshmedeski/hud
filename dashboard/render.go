@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	colorAccent       = lipgloss.ANSIColor(14)
+	colorAccent       = lipgloss.ANSIColor(4)
 	colorDimmed       = lipgloss.ANSIColor(8)
 	colorText         = lipgloss.ANSIColor(15)
 	colorWarning      = lipgloss.ANSIColor(11)
@@ -98,86 +98,52 @@ type frameColumn struct {
 	panes []framePane
 }
 
-func (c frameColumn) lines(innerHeight int) (lines []string, divider []bool) {
-	for s, p := range c.panes {
-		if s > 0 {
-			lines = append(lines, frameSegment(p.title, c.width, p.focused))
-			divider = append(divider, true)
-		}
-		content := strings.Split(p.content, "\n")
-		for row := range p.height {
-			line := ""
-			if row < len(content) {
-				line = content[row]
-			}
-			lines = append(lines, padWidth(line, c.width))
-			divider = append(divider, false)
-		}
+func (p framePane) box(width int) []string {
+	border := DimmedStyle()
+	if p.focused {
+		border = lipgloss.NewStyle().Foreground(colorAccent)
 	}
-	for len(lines) < innerHeight {
-		lines = append(lines, strings.Repeat(" ", c.width))
-		divider = append(divider, false)
+	lines := []string{border.Render("┌") + frameSegment(p.title, width, p.focused) + border.Render("┐")}
+	content := strings.Split(p.content, "\n")
+	for row := range p.height {
+		line := ""
+		if row < len(content) {
+			line = content[row]
+		}
+		lines = append(lines, border.Render("│")+padWidth(line, width)+border.Render("│"))
 	}
-	return lines[:innerHeight], divider[:innerHeight]
-}
-
-var junctions = map[[2]bool]string{
-	{false, false}: "│", {true, false}: "┤", {false, true}: "├", {true, true}: "┼",
+	return append(lines, border.Render("└"+strings.Repeat("─", width)+"┘"))
 }
 
 func renderFrame(cols []frameColumn, height int) string {
-	if len(cols) == 0 {
-		return ""
-	}
-	innerHeight := max(height-2, 1)
-	lines := make([][]string, len(cols))
-	dividers := make([][]bool, len(cols))
-	for i, c := range cols {
-		lines[i], dividers[i] = c.lines(innerHeight)
-	}
-
-	var b strings.Builder
-	b.WriteString(borderText("┌"))
-	for i, c := range cols {
-		if i > 0 {
-			b.WriteString(borderText("┬"))
+	rows := make([]string, height)
+	for _, c := range cols {
+		var lines []string
+		for _, p := range c.panes {
+			lines = append(lines, p.box(c.width)...)
 		}
-		b.WriteString(frameSegment(c.panes[0].title, c.width, c.panes[0].focused))
-	}
-	b.WriteString(borderText("┐"))
-	b.WriteString("\n")
-
-	for row := range innerHeight {
-		for i := range cols {
-			b.WriteString(borderText(junctions[[2]bool{i > 0 && dividers[i-1][row], dividers[i][row]}]))
-			b.WriteString(lines[i][row])
+		for row := range rows {
+			if row < len(lines) {
+				rows[row] += lines[row]
+			} else {
+				rows[row] += strings.Repeat(" ", c.width+2)
+			}
 		}
-		b.WriteString(borderText(junctions[[2]bool{dividers[len(cols)-1][row], false}]))
-		b.WriteString("\n")
 	}
-
-	b.WriteString(borderText("└"))
-	for i, c := range cols {
-		if i > 0 {
-			b.WriteString(borderText("┴"))
-		}
-		b.WriteString(borderText(strings.Repeat("─", c.width)))
-	}
-	b.WriteString(borderText("┘"))
-	return b.String()
+	return strings.Join(rows, "\n")
 }
 
 func frameSegment(title string, width int, focused bool) string {
-	if width < 4 {
-		return borderText(strings.Repeat("─", max(width, 1)))
-	}
-	style := DimmedStyle()
+	border, text := DimmedStyle(), DimmedStyle()
 	if focused {
-		style = accentStyle()
+		border, text = lipgloss.NewStyle().Foreground(colorAccent), accentStyle()
+	}
+	if width < 4 {
+		return border.Render(strings.Repeat("─", max(width, 1)))
 	}
 	title = ansi.Truncate(title, width-4, "…")
 	filler := max(width-3-lipgloss.Width(title), 1)
-	return borderText("─") + style.Render(" "+title+" ") + borderText(strings.Repeat("─", filler))
+	return border.Render("─") + text.Render(" "+title+" ") + border.Render(strings.Repeat("─", filler))
 }
 
 func padWidth(s string, width int) string {
