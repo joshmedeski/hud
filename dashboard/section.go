@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"image/color"
 	"os/exec"
 	"slices"
 	"strings"
@@ -219,7 +218,7 @@ func (p *listPane) parse() {
 		p.painted[i] = make([]string, len(p.recipe.Columns))
 		for c, col := range p.recipe.Columns {
 			p.cells[i][c] = cellText(item[col])
-			p.painted[i][c] = paint(p.cells[i][c], cellColor(p.recipe.Colors[col], p.cells[i][c], item))
+			p.painted[i][c] = paint(p.cells[i][c], cellStyle(p.recipe.Colors[col], p.cells[i][c], item))
 		}
 	}
 	p.applyFilter()
@@ -242,7 +241,7 @@ func cellText(v any) string {
 	}
 }
 
-func cellColor(rule any, cell string, item map[string]any) color.Color {
+func cellStyle(rule any, cell string, item map[string]any) string {
 	if byValue, ok := rule.(map[string]any); ok {
 		rule = byValue[cell]
 	}
@@ -250,11 +249,11 @@ func cellColor(rule any, cell string, item map[string]any) color.Color {
 	if strings.Contains(s, "{{") {
 		out, err := expand([]string{s}, item)
 		if err != nil {
-			return nil
+			return ""
 		}
 		s = out[0]
 	}
-	return parseColor(s)
+	return s
 }
 
 func (p *listPane) handleKey(msg tea.KeyPressMsg) tea.Cmd {

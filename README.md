@@ -106,9 +106,10 @@ colors = { State = { OPEN = "green", CLOSED = "red" }, Title = "brightwhite" }
 ```
 
 A color is an ANSI name (`black` `red` `green` `yellow` `blue` `magenta`
-`cyan` `white`, or `bright` + any of them, like `brightred`), an ANSI number
-(`0`–`255`), or a hex code (`#8295AF`, `8295AF`). A color can also be a
-template, so a hex code already in the JSON can color its row:
+`cyan` `white` `gray`, or `bright` + any of them, like `brightred`), an ANSI
+number (`0`–`255`), or a hex code (`#8295AF`, `8295AF`). Add `bold` and
+`italic`, separated by spaces: `colors = { when = "gray italic" }`. A color
+can also be a template, so a hex code already in the JSON can color its row:
 
 ```toml
 colors = { title = "{{.color}}" }

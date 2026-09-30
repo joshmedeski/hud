@@ -78,8 +78,8 @@ func (c Config) resolve(sc SectionConfig) (Recipe, error) {
 func checkColorRule(rule any) error {
 	switch rule := rule.(type) {
 	case string:
-		if !strings.Contains(rule, "{{") && parseColor(rule) == nil {
-			return fmt.Errorf("unknown color %q", rule)
+		if _, _, ok := parseStyle(rule); !ok && !strings.Contains(rule, "{{") {
+			return fmt.Errorf("unknown style %q", rule)
 		}
 	case map[string]any:
 		for _, v := range rule {

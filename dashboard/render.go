@@ -39,6 +39,7 @@ var colorNames = map[string]color.Color{
 	"brightblack": lipgloss.BrightBlack, "brightred": lipgloss.BrightRed, "brightgreen": lipgloss.BrightGreen,
 	"brightyellow": lipgloss.BrightYellow, "brightblue": lipgloss.BrightBlue, "brightmagenta": lipgloss.BrightMagenta,
 	"brightcyan": lipgloss.BrightCyan, "brightwhite": lipgloss.BrightWhite,
+	"gray": lipgloss.BrightBlack, "grey": lipgloss.BrightBlack,
 }
 
 func parseColor(s string) color.Color {
@@ -55,11 +56,30 @@ func parseColor(s string) color.Color {
 	return nil
 }
 
-func paint(s string, c color.Color) string {
-	if c == nil || s == "" {
+func parseStyle(spec string) (on, off ansi.Style, ok bool) {
+	for _, word := range strings.Fields(spec) {
+		switch strings.ToLower(word) {
+		case "bold":
+			on, off = on.Bold(), off.Normal()
+		case "italic":
+			on, off = on.Italic(true), off.Italic(false)
+		default:
+			c := parseColor(word)
+			if c == nil {
+				return nil, nil, false
+			}
+			on, off = on.ForegroundColor(c), off.ForegroundColor(nil)
+		}
+	}
+	return on, off, len(on) > 0
+}
+
+func paint(s, spec string) string {
+	on, off, ok := parseStyle(spec)
+	if !ok || s == "" {
 		return s
 	}
-	return ansi.Style{}.ForegroundColor(c).String() + s + ansi.Style{}.ForegroundColor(nil).String()
+	return on.String() + s + off.String()
 }
 
 func borderText(s string) string { return DimmedStyle().Render(s) }

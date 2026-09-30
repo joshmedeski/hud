@@ -258,7 +258,7 @@ func TestColumnColors(t *testing.T) {
 [recipe.prs]
 command = '''echo '[{"State":"OPEN","cal":"Work","color":"#8295AF"},{"State":"CLOSED","cal":"Home","color":"d73a4a"},{"State":"DRAFT","cal":"x"}]' '''
 columns = ["State", "cal"]
-colors = { State = { OPEN = "green", CLOSED = "BrightRed" }, cal = "{{.color}}" }
+colors = { State = { OPEN = "green", CLOSED = "bold BrightRed" }, cal = "{{.color}}" }
 
 [[page]]
 sections = [[{ recipe = "prs" }]]
@@ -272,8 +272,8 @@ sections = [[{ recipe = "prs" }]]
 	}
 	p := loadedList(t, r)
 	want := [][]string{
-		{paint("OPEN", lipgloss.Green), paint("Work", lipgloss.Color("#8295AF"))},
-		{paint("CLOSED", lipgloss.BrightRed), paint("Home", lipgloss.Color("#d73a4a"))},
+		{"\x1b[32mOPEN\x1b[39m", "\x1b[38;2;130;149;175mWork\x1b[39m"},
+		{"\x1b[1;91mCLOSED\x1b[22;39m", "\x1b[38;2;215;58;74mHome\x1b[39m"},
 		{"DRAFT", "x"},
 	}
 	for i, row := range want {
