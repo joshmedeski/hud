@@ -8,9 +8,11 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
+type column []Section
+
 type page struct {
 	title string
-	rows  [][]Section
+	rows  [][]column
 }
 
 type Model struct {
@@ -32,15 +34,15 @@ type Model struct {
 func New(cfg Config) (Model, error) {
 	var pages []page
 	for i, pc := range cfg.Pages {
-		var rows [][]Section
+		var rows [][]column
 		for _, rowCfg := range pc.Sections {
-			var row []Section
+			var row []column
 			for _, sc := range rowCfg {
-				r, err := cfg.resolve(sc)
+				col, err := cfg.column(sc)
 				if err != nil {
 					return Model{}, err
 				}
-				row = append(row, newSection(sc.Title, r))
+				row = append(row, col)
 			}
 			if len(row) > 0 {
 				rows = append(rows, row)
@@ -60,6 +62,25 @@ func New(cfg Config) (Model, error) {
 	}
 	m := Model{pages: pages, width: 80, height: 24}
 	return m.withLayout(), nil
+}
+
+func (c Config) column(sc SectionConfig) (column, error) {
+	members := sc.Stack
+	if len(members) == 0 {
+		members = []SectionConfig{sc}
+	}
+	var col column
+	for _, member := range members {
+		if len(member.Stack) > 0 {
+			return nil, fmt.Errorf("section %q: a stack can't contain another stack", member.Title)
+		}
+		r, err := c.resolve(member)
+		if err != nil {
+			return nil, err
+		}
+		col = append(col, newSection(member.Title, r))
+	}
+	return col, nil
 }
 
 func (m Model) Action() []string { return m.action }
@@ -163,20 +184,44 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
 	}
 	cy := e.Y - 2
 	top, base := 0, 0
-	for r, panes := range m.rows() {
+	for r, cols := range m.rows() {
 		if cy >= top && cy < top+m.rowHeights[r] {
-			if col := paneCol(e.X, m.rowWidths[r]); col >= 0 {
-				m.focus = base + col
-				if l, ok := panes[col].(*listPane); ok {
-					l.ClickAt(cy - top - 1)
+			c := paneCol(e.X, m.rowWidths[r])
+			if c < 0 {
+				return m
+			}
+			for _, prev := range cols[:c] {
+				base += len(prev)
+			}
+			line, start := cy-top-1, 0
+			for s, h := range stackHeights(m.rowHeights[r]-2, len(cols[c])) {
+				if line < start+h || s == len(cols[c])-1 {
+					m.focus = base + s
+					if l, ok := cols[c][s].(*listPane); ok {
+						l.ClickAt(line - start)
+					}
+					return m
 				}
+				start += h + 1
 			}
 			return m
 		}
 		top += m.rowHeights[r]
-		base += len(panes)
+		base += paneTotal(cols)
 	}
 	return m
+}
+
+func stackHeights(inner, n int) []int {
+	return splitEvenly(max(inner-(n-1), n), n)
+}
+
+func paneTotal(cols []column) int {
+	n := 0
+	for _, col := range cols {
+		n += len(col)
+	}
+	return n
 }
 
 func paneCol(x int, widths []int) int {
@@ -190,39 +235,59 @@ func paneCol(x int, widths []int) int {
 	return -1
 }
 
-func (m Model) rows() [][]Section { return m.pages[m.page].rows }
+func (m Model) rows() [][]column { return m.pages[m.page].rows }
 
 func (m Model) paneCount() int {
 	n := 0
-	for _, row := range m.rows() {
-		n += len(row)
+	for _, cols := range m.rows() {
+		n += paneTotal(cols)
 	}
 	return n
 }
 
-func (m Model) paneAt(idx int) (row, col int, ok bool) {
-	for r, panes := range m.rows() {
-		if idx < len(panes) {
-			return r, idx, idx >= 0
-		}
-		idx -= len(panes)
+func (m Model) paneAt(idx int) (row, col, stack int, ok bool) {
+	if idx < 0 {
+		return 0, 0, 0, false
 	}
-	return 0, 0, false
+	for r, cols := range m.rows() {
+		for c, panes := range cols {
+			if idx < len(panes) {
+				return r, c, idx, true
+			}
+			idx -= len(panes)
+		}
+	}
+	return 0, 0, 0, false
+}
+
+func (m Model) indexOf(row, col, stack int) int {
+	idx := stack
+	for r, cols := range m.rows()[:row+1] {
+		for c, panes := range cols {
+			if r == row && c == col {
+				return idx
+			}
+			idx += len(panes)
+		}
+	}
+	return idx
 }
 
 func (m Model) focused() Section {
-	r, c, ok := m.paneAt(m.focus)
+	r, c, s, ok := m.paneAt(m.focus)
 	if !ok {
 		return nil
 	}
-	return m.rows()[r][c]
+	return m.rows()[r][c][s]
 }
 
 func (m Model) allSections() []Section {
 	var out []Section
 	for _, p := range m.pages {
-		for _, row := range p.rows {
-			out = append(out, row...)
+		for _, cols := range p.rows {
+			for _, panes := range cols {
+				out = append(out, panes...)
+			}
 		}
 	}
 	return out
@@ -235,16 +300,25 @@ func (m Model) moveFocus(delta int) Model {
 }
 
 func (m Model) moveFocusRow(dir int) Model {
-	r, c, ok := m.paneAt(m.focus)
-	rows := m.rows()
-	target := r + dir
-	if !ok || target < 0 || target >= len(rows) {
+	r, c, s, ok := m.paneAt(m.focus)
+	if !ok {
 		return m
 	}
-	m.focus = min(c, len(rows[target])-1)
-	for _, panes := range rows[:target] {
-		m.focus += len(panes)
+	rows := m.rows()
+	if s+dir >= 0 && s+dir < len(rows[r][c]) {
+		m.focus += dir
+		return m
 	}
+	target := r + dir
+	if target < 0 || target >= len(rows) {
+		return m
+	}
+	c = min(c, len(rows[target])-1)
+	s = 0
+	if dir < 0 {
+		s = len(rows[target][c]) - 1
+	}
+	m.focus = m.indexOf(target, c, s)
 	return m
 }
 
@@ -252,8 +326,8 @@ func (m Model) withLayout() Model {
 	m.contentHeight = max(m.height-3, 1)
 	rows := m.rows()
 	m.rowWidths = make([][]int, len(rows))
-	for r, panes := range rows {
-		m.rowWidths[r] = splitEvenly(max(m.width-len(panes)-1, len(panes)), len(panes))
+	for r, cols := range rows {
+		m.rowWidths[r] = splitEvenly(max(m.width-len(cols)-1, len(cols)), len(cols))
 	}
 	m.rowHeights = splitEvenly(m.contentHeight, len(rows))
 	return m
@@ -310,20 +384,24 @@ func (m Model) View() tea.View {
 func (m Model) viewPage() string {
 	frames := make([]string, 0, len(m.rows()))
 	base := 0
-	for r, panes := range m.rows() {
-		fp := make([]framePane, len(panes))
-		for i, s := range panes {
+	for r, cols := range m.rows() {
+		fc := make([]frameColumn, len(cols))
+		for i, panes := range cols {
 			w := m.rowWidths[r][i]
-			focused := m.focus == base+i
-			fp[i] = framePane{
-				title:   fmt.Sprintf("%d %s", base+i+1, s.Title()),
-				content: s.View(w, m.rowHeights[r]-2, focused),
-				width:   w,
-				focused: focused,
+			heights := stackHeights(m.rowHeights[r]-2, len(panes))
+			fc[i] = frameColumn{width: w, panes: make([]framePane, len(panes))}
+			for s, sec := range panes {
+				focused := m.focus == base
+				fc[i].panes[s] = framePane{
+					title:   fmt.Sprintf("%d %s", base+1, sec.Title()),
+					content: sec.View(w, heights[s], focused),
+					height:  heights[s],
+					focused: focused,
+				}
+				base++
 			}
 		}
-		frames = append(frames, renderFrame(fp, m.rowHeights[r]))
-		base += len(panes)
+		frames = append(frames, renderFrame(fc, m.rowHeights[r]))
 	}
 	return lipgloss.JoinVertical(lipgloss.Top, frames...)
 }

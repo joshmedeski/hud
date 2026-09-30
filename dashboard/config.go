@@ -23,8 +23,9 @@ type Recipe struct {
 }
 
 type SectionConfig struct {
-	Title string `toml:"title"`
-	Use   string `toml:"recipe"`
+	Title string          `toml:"title"`
+	Use   string          `toml:"recipe"`
+	Stack []SectionConfig `toml:"stack"`
 	Recipe
 }
 

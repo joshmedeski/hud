@@ -360,3 +360,72 @@ func TestEmojiWidthsMatchTheRenderer(t *testing.T) {
 		}
 	}
 }
+
+func TestStackedColumn(t *testing.T) {
+	cfg, err := LoadConfig(writeConfig(t, `
+[[page]]
+sections = [
+  [{ stack = [{ title = "Top", command = "echo top" }, { title = "Bottom", command = "echo bottom" }] }, { title = "Side", command = "echo side" }],
+  [{ title = "Wide", command = "echo wide" }],
+]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sec := range m.allSections() {
+		src := sec.(*textPane)
+		src.Update(src.fetch(nil)())
+	}
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 40, Height: 23})
+	m = next.(Model)
+
+	lines := strings.Split(ansi.Strip(m.viewPage()), "\n")
+	for i, line := range lines {
+		if w := lipgloss.Width(line); w != 40 {
+			t.Errorf("line %d is %d wide: %q", i, w, line)
+		}
+	}
+	if !strings.Contains(lines[0], "1 Top") || !strings.Contains(lines[0], "3 Side") {
+		t.Errorf("top border = %q", lines[0])
+	}
+	var divider string
+	for _, line := range lines {
+		if strings.Contains(line, "2 Bottom") {
+			divider = line
+		}
+	}
+	if !strings.HasPrefix(divider, "├─ 2 Bottom") || !strings.Contains(divider, "┤") {
+		t.Errorf("stack divider = %q", divider)
+	}
+
+	press := func(k tea.KeyPressMsg) {
+		next, _ := m.Update(k)
+		m = next.(Model)
+	}
+	ctrl := func(r rune) tea.KeyPressMsg { return tea.KeyPressMsg{Code: r, Mod: tea.ModCtrl} }
+	for i, step := range []struct {
+		key  tea.KeyPressMsg
+		want string
+	}{{ctrl('j'), "Bottom"}, {ctrl('j'), "Wide"}, {ctrl('k'), "Bottom"}, {ctrl('k'), "Top"}, {key("l"), "Bottom"}, {key("l"), "Side"}} {
+		press(step.key)
+		if got := m.focused().Title(); got != step.want {
+			t.Fatalf("step %d: focused %q, want %q", i, got, step.want)
+		}
+	}
+
+	for line, want := range map[int]string{2: "Top", 5: "Bottom", 7: "Bottom", 12: "Wide"} {
+		next := m.handleMouseClick(tea.MouseClickMsg{X: 3, Y: line + 2, Button: tea.MouseLeft})
+		if got := next.focused().Title(); got != want {
+			t.Errorf("click on line %d focused %q, want %q", line, got, want)
+		}
+	}
+
+	cfg.Pages[0].Sections[0][0].Stack[0].Stack = []SectionConfig{{}}
+	if _, err := New(cfg); err == nil {
+		t.Error("a nested stack should error")
+	}
+}

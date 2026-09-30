@@ -180,6 +180,24 @@ The first page has two rows of two panes each. `Sessions` and
 `Weather` has no recipe and no columns, so its output (colors included) is
 shown as-is. The second page stacks two full-width panes.
 
+To stack panes inside one column of a row, give the row a `stack` of sections
+instead of a single section:
+
+```toml
+[[page]]
+title = "Life"
+sections = [
+  [
+    { stack = [{ title = "Calendars", recipe = "calendar" }, { title = "Weather", command = "curl -s 'wttr.in?0'" }] },
+    { title = "Reminders", recipe = "reminders" },
+  ],
+]
+```
+
+Calendars and Weather share the left half, one above the other, and Reminders
+fills the right half. Panes are numbered row by row, top to bottom within a
+stack, and `ctrl+j` / `ctrl+k` move through a stack before leaving it.
+
 ## Keybindings
 
 | Key                                   | Action                                |

@@ -89,50 +89,79 @@ var separator = borderText(" │ ")
 type framePane struct {
 	title   string
 	content string
-	width   int
+	height  int
 	focused bool
 }
 
-func renderFrame(panes []framePane, height int) string {
-	if len(panes) == 0 {
+type frameColumn struct {
+	width int
+	panes []framePane
+}
+
+func (c frameColumn) lines(innerHeight int) (lines []string, divider []bool) {
+	for s, p := range c.panes {
+		if s > 0 {
+			lines = append(lines, frameSegment(p.title, c.width, p.focused))
+			divider = append(divider, true)
+		}
+		content := strings.Split(p.content, "\n")
+		for row := range p.height {
+			line := ""
+			if row < len(content) {
+				line = content[row]
+			}
+			lines = append(lines, padWidth(line, c.width))
+			divider = append(divider, false)
+		}
+	}
+	for len(lines) < innerHeight {
+		lines = append(lines, strings.Repeat(" ", c.width))
+		divider = append(divider, false)
+	}
+	return lines[:innerHeight], divider[:innerHeight]
+}
+
+var junctions = map[[2]bool]string{
+	{false, false}: "│", {true, false}: "┤", {false, true}: "├", {true, true}: "┼",
+}
+
+func renderFrame(cols []frameColumn, height int) string {
+	if len(cols) == 0 {
 		return ""
 	}
 	innerHeight := max(height-2, 1)
-	lines := make([][]string, len(panes))
-	for i, p := range panes {
-		lines[i] = strings.Split(p.content, "\n")
+	lines := make([][]string, len(cols))
+	dividers := make([][]bool, len(cols))
+	for i, c := range cols {
+		lines[i], dividers[i] = c.lines(innerHeight)
 	}
 
 	var b strings.Builder
 	b.WriteString(borderText("┌"))
-	for i, p := range panes {
+	for i, c := range cols {
 		if i > 0 {
 			b.WriteString(borderText("┬"))
 		}
-		b.WriteString(frameSegment(p.title, p.width, p.focused))
+		b.WriteString(frameSegment(c.panes[0].title, c.width, c.panes[0].focused))
 	}
 	b.WriteString(borderText("┐"))
 	b.WriteString("\n")
 
 	for row := range innerHeight {
-		b.WriteString(borderText("│"))
-		for i, p := range panes {
-			line := ""
-			if row < len(lines[i]) {
-				line = lines[i][row]
-			}
-			b.WriteString(padWidth(line, p.width))
-			b.WriteString(borderText("│"))
+		for i := range cols {
+			b.WriteString(borderText(junctions[[2]bool{i > 0 && dividers[i-1][row], dividers[i][row]}]))
+			b.WriteString(lines[i][row])
 		}
+		b.WriteString(borderText(junctions[[2]bool{dividers[len(cols)-1][row], false}]))
 		b.WriteString("\n")
 	}
 
 	b.WriteString(borderText("└"))
-	for i, p := range panes {
+	for i, c := range cols {
 		if i > 0 {
 			b.WriteString(borderText("┴"))
 		}
-		b.WriteString(borderText(strings.Repeat("─", p.width)))
+		b.WriteString(borderText(strings.Repeat("─", c.width)))
 	}
 	b.WriteString(borderText("┘"))
 	return b.String()
