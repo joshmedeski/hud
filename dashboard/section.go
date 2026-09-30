@@ -213,7 +213,13 @@ func cellText(v any) string {
 	case nil:
 		return ""
 	case string:
-		return v
+		return strings.Join(strings.Fields(v), " ")
+	case []any:
+		parts := make([]string, len(v))
+		for i, e := range v {
+			parts[i] = cellText(e)
+		}
+		return strings.Join(parts, " ")
 	default:
 		return fmt.Sprint(v)
 	}

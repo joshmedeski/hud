@@ -60,7 +60,8 @@ func renderFrame(panes []framePane, height int) string {
 		}
 		b.WriteString(frameSegment(p.title, p.width, p.focused))
 	}
-	b.WriteString(borderText("┐") + "\n")
+	b.WriteString(borderText("┐"))
+	b.WriteString("\n")
 
 	for row := range innerHeight {
 		b.WriteString(borderText("│"))
@@ -122,10 +123,11 @@ type keybind struct{ key, label string }
 var footerBinds = []keybind{
 	{"tab", "page"},
 	{"j/k", "move"},
+	{"h/l", "pane"},
 	{"enter", "open"},
 	{"/", "filter"},
 	{"r", "refresh"},
-	{"1-9", "panes"},
+	{"1-9", "jump"},
 	{"q", "quit"},
 }
 
@@ -167,7 +169,8 @@ func renderHelp(width, height int, extra map[string][]string) string {
 		{"enter", "open"},
 		{"/", "filter"},
 		{"r", "refresh"},
-		{"ctrl+h / ctrl+l", "focus pane left / right"},
+		{"h/l ←/→", "previous / next pane"},
+		{"ctrl+h / ctrl+l", "previous / next pane"},
 		{"ctrl+j / ctrl+k", "focus pane below / above"},
 		{"1-9", "focus pane"},
 		{"click", "focus pane and select row"},

@@ -4,15 +4,46 @@ columns = ["Icon", "Name", "Path"]
 enter = ["sesh", "connect", "{{.Name}}"]
 keys = { "ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"] }
 
+[recipe.worktree]
+columns = ["Number", "State", "Title"]
+enter = ["sesh", "connect", "{{.Path}}"]
+
 [[page]]
 title = "Dashboard"
 sections = [
   [
-    { title = "Sessions", recipe = "sesh", command = "sesh list -t --json", columns = ["Icon", "Attached", "Name"] },
+    { title = "Sessions", recipe = "sesh", command = "sesh list -t --json", columns = [
+      "Icon",
+      "Attached",
+      "Name",
+      "Alerts",
+    ] },
     { title = "Weather", command = "curl -s 'wttr.in?0'", refresh = 300 },
   ],
   [
-    { title = "Config + Zoxide", recipe = "sesh", command = "sesh list -c -z --json" },
+    { title = "Config + Zoxide", recipe = "sesh", command = "sesh list -c -z -d --json", columns = [
+      "Icon",
+      "Name",
+    ] },
+    { title = "Nutiliti/nutiliti", recipe = "worktree", command = "sesh worktree list -r Nutiliti/nutiliti --json", enter = [
+      "sesh",
+      "worktree",
+      "connect",
+      "{{.Number}}",
+      "-r",
+      "Nutiliti/nutiliti",
+    ] },
+    { title = "joshmedeski/sesh", recipe = "worktree", command = "sesh worktree list -r joshmedeski/sesh --json", columns = [
+      "Title",
+      "State",
+    ], enter = [
+      "sesh",
+      "worktree",
+      "connect",
+      "{{.Number}}",
+      "-r",
+      "joshmedeski/sesh",
+    ] },
   ],
 ]
 

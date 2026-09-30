@@ -146,6 +146,41 @@ func TestEnterQuitsWithAction(t *testing.T) {
 	}
 }
 
+func TestPaneNavigationKeys(t *testing.T) {
+	list := SectionConfig{Recipe: Recipe{Command: `echo '[{"Name":"a"}]'`, Columns: []string{"Name"}}}
+	m, err := New(Config{Pages: []PageConfig{{Sections: [][]SectionConfig{{list, {}}, {{}}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	press := func(k tea.KeyPressMsg) {
+		next, _ := m.Update(k)
+		m = next.(Model)
+	}
+	steps := []struct {
+		key  tea.KeyPressMsg
+		want int
+	}{
+		{key("l"), 1},
+		{tea.KeyPressMsg{Code: tea.KeyRight}, 2},
+		{key("l"), 0},
+		{key("h"), 2},
+		{tea.KeyPressMsg{Code: tea.KeyLeft}, 1},
+		{key("h"), 0},
+	}
+	for i, s := range steps {
+		press(s.key)
+		if m.focus != s.want {
+			t.Fatalf("step %d (%s): focus = %d, want %d", i, s.key, m.focus, s.want)
+		}
+	}
+
+	press(key("/"))
+	press(key("l"))
+	if m.focus != 0 || m.focused().(*listPane).FilterQuery() != "l" {
+		t.Errorf("l while filtering should type, got focus %d query %q", m.focus, m.focused().(*listPane).FilterQuery())
+	}
+}
+
 func TestLayout(t *testing.T) {
 	if got := splitEvenly(10, 3); !slices.Equal(got, []int{4, 3, 3}) {
 		t.Errorf("splitEvenly = %v", got)
@@ -155,6 +190,31 @@ func TestLayout(t *testing.T) {
 		if got := paneCol(x, widths); got != want {
 			t.Errorf("paneCol(%d) = %d, want %d", x, got, want)
 		}
+	}
+}
+
+func TestWorktreeRowRendersIntegersAndLists(t *testing.T) {
+	p := loadedList(t, Recipe{
+		Command: `printf '%s' '[{"Number":7235,"Alerts":["bell","activity"],"location":"Cafe\n626 E Ninth St"}]'`,
+		Columns: []string{"Number", "Alerts", "location"},
+		Enter:   []string{"sesh", "worktree", "connect", "{{.Number}}"},
+	})
+	if got := p.cells[0]; !slices.Equal(got, []string{"7235", "bell activity", "Cafe 626 E Ninth St"}) {
+		t.Errorf("cells = %q", got)
+	}
+	p.Update(key("enter"))
+	if got := p.Chosen(); len(got) != 4 || got[3] != "7235" {
+		t.Errorf("chosen = %q", got)
+	}
+}
+
+func TestExampleConfigLoads(t *testing.T) {
+	cfg, err := LoadConfig("../hud.example.toml")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := New(cfg); err != nil {
+		t.Fatal(err)
 	}
 }
 

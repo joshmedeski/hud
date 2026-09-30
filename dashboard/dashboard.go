@@ -121,9 +121,9 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch {
-	case isBackspaceKey(msg):
+	case isBackspaceKey(msg), msg.String() == "h", msg.String() == "left":
 		return m.moveFocus(-1), nil
-	case isCtrlKey(msg, 'l'):
+	case isCtrlKey(msg, 'l'), msg.String() == "l", msg.String() == "right":
 		return m.moveFocus(1), nil
 	case isCtrlKey(msg, 'j'):
 		return m.moveFocusRow(1), nil
