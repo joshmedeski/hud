@@ -352,10 +352,10 @@ func TestEmojiWidthsMatchTheRenderer(t *testing.T) {
 		Columns: []string{"icon", "name"},
 	})
 	for _, line := range strings.Split(p.View(20, 10, false), "\n")[1:] {
-		if w := widthMethod.StringWidth(padWidth(line, 20)); w != 20 {
+		if w := lipgloss.Width(padWidth(line, 20)); w != 20 {
 			t.Errorf("%q is %d cells wide, want 20", line, w)
 		}
-		if i := strings.IndexAny(line, "abcd"); widthMethod.StringWidth(line[:i]) != 7 {
+		if i := strings.IndexAny(line, "abcd"); lipgloss.Width(line[:i]) != 7 {
 			t.Errorf("name column misaligned in %q", line)
 		}
 	}

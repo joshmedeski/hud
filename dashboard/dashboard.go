@@ -64,8 +64,12 @@ func New(cfg Config) (Model, error) {
 
 func (m Model) Action() []string { return m.action }
 
+func useGraphemeWidths() tea.Msg {
+	return tea.ModeReportMsg{Mode: ansi.ModeUnicodeCore, Value: ansi.ModeSet}
+}
+
 func (m Model) Init() tea.Cmd {
-	var cmds []tea.Cmd
+	cmds := []tea.Cmd{useGraphemeWidths}
 	for _, sec := range m.allSections() {
 		cmds = append(cmds, sec.Init())
 	}
@@ -78,11 +82,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width, m.height = msg.Width, msg.Height
 		m.tooSmall = m.width < 20 || m.height < 5
 		return m.withLayout(), nil
-	case tea.ModeReportMsg:
-		if msg.Mode == ansi.ModeUnicodeCore && (msg.Value == ansi.ModeSet || msg.Value == ansi.ModeReset || msg.Value == ansi.ModePermanentlySet) {
-			widthMethod = ansi.GraphemeWidth
-		}
-		return m, nil
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:

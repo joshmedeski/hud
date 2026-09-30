@@ -12,6 +12,8 @@ import (
 	"unicode"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type Section interface {
@@ -422,10 +424,10 @@ func (p *listPane) columnWidths(width int) []int {
 	total := 1 + 2*(len(widths)-1)
 	for c := range widths {
 		if p.headers != nil {
-			widths[c] = widthMethod.StringWidth(p.headers[c])
+			widths[c] = lipgloss.Width(p.headers[c])
 		}
 		for _, row := range p.cells {
-			widths[c] = max(widths[c], widthMethod.StringWidth(row[c]))
+			widths[c] = max(widths[c], lipgloss.Width(row[c]))
 		}
 		total += widths[c]
 	}
@@ -459,10 +461,10 @@ func joinCells(cells []string, widths []int) string {
 	var b strings.Builder
 	b.WriteString(" ")
 	for c, cell := range cells {
-		cell = widthMethod.Truncate(cell, widths[c], "…")
+		cell = ansi.Truncate(cell, widths[c], "…")
 		b.WriteString(cell)
 		if c < len(cells)-1 {
-			b.WriteString(strings.Repeat(" ", widths[c]-widthMethod.StringWidth(cell)+2))
+			b.WriteString(strings.Repeat(" ", widths[c]-lipgloss.Width(cell)+2))
 		}
 	}
 	return b.String()

@@ -21,8 +21,6 @@ var (
 	colorHighlightDim = lipgloss.ANSIColor(236)
 )
 
-var widthMethod = ansi.WcWidth
-
 func accentStyle() lipgloss.Style  { return lipgloss.NewStyle().Foreground(colorAccent).Bold(true) }
 func DimmedStyle() lipgloss.Style  { return lipgloss.NewStyle().Foreground(colorDimmed) }
 func TextStyle() lipgloss.Style    { return lipgloss.NewStyle().Foreground(colorText) }
@@ -148,15 +146,15 @@ func frameSegment(title string, width int, focused bool) string {
 	if focused {
 		style = accentStyle()
 	}
-	title = widthMethod.Truncate(title, width-4, "…")
-	filler := max(width-3-widthMethod.StringWidth(title), 1)
+	title = ansi.Truncate(title, width-4, "…")
+	filler := max(width-3-lipgloss.Width(title), 1)
 	return borderText("─") + style.Render(" "+title+" ") + borderText(strings.Repeat("─", filler))
 }
 
 func padWidth(s string, width int) string {
 	width = max(width, 1)
-	s = widthMethod.Truncate(s, width, "")
-	return s + strings.Repeat(" ", max(width-widthMethod.StringWidth(s), 0))
+	s = ansi.Truncate(s, width, "")
+	return s + strings.Repeat(" ", max(width-lipgloss.Width(s), 0))
 }
 
 func renderHeader(active, width int, tabs []string) string {
