@@ -2,9 +2,7 @@ package dashboard
 
 import (
 	"cmp"
-	"errors"
 	"fmt"
-	"io/fs"
 	"maps"
 	"os"
 	"path/filepath"
@@ -36,20 +34,6 @@ type Config struct {
 	Pages   []PageConfig      `toml:"page"`
 }
 
-var builtinRecipes = map[string]Recipe{
-	"sesh": {
-		Command: "sesh list --json",
-		Columns: []string{"Icon", "Name", "Path"},
-		Enter:   []string{"sesh", "connect", "{{.Name}}"},
-		Keys:    map[string][]string{"ctrl+d": {"tmux", "kill-session", "-t", "{{.Name}}"}},
-	},
-}
-
-var defaultPages = []PageConfig{{
-	Title:    "Dashboard",
-	Sections: [][]SectionConfig{{{Title: "Sessions", Use: "sesh"}}},
-}}
-
 func DefaultConfigPath() string {
 	dir := os.Getenv("XDG_CONFIG_HOME")
 	if dir == "" {
@@ -60,28 +44,16 @@ func DefaultConfigPath() string {
 }
 
 func LoadConfig(path string) (Config, error) {
-	explicit := path != ""
-	if !explicit {
+	if path == "" {
 		path = DefaultConfigPath()
 	}
-
 	var cfg Config
 	b, err := os.ReadFile(path)
-	switch {
-	case errors.Is(err, fs.ErrNotExist) && !explicit:
-	case err != nil:
+	if err != nil {
 		return cfg, err
-	default:
-		if err := toml.Unmarshal(b, &cfg); err != nil {
-			return cfg, fmt.Errorf("%s: %w", path, err)
-		}
 	}
-
-	recipes := maps.Clone(builtinRecipes)
-	maps.Copy(recipes, cfg.Recipes)
-	cfg.Recipes = recipes
-	if len(cfg.Pages) == 0 {
-		cfg.Pages = defaultPages
+	if err := toml.Unmarshal(b, &cfg); err != nil {
+		return cfg, fmt.Errorf("%s: %w", path, err)
 	}
 	return cfg, nil
 }

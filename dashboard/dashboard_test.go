@@ -20,10 +20,16 @@ func writeConfig(t *testing.T, body string) string {
 
 func TestLoadConfigResolvesRecipeOverrides(t *testing.T) {
 	cfg, err := LoadConfig(writeConfig(t, `
+[recipe.items]
+command = "list-items"
+columns = ["Name"]
+enter = ["open-item", "{{.Name}}"]
+keys = { "ctrl+d" = ["remove-item", "{{.Name}}"] }
+
 [[page]]
 title = "Main"
 sections = [[
-  { title = "Tmux", recipe = "sesh", command = "sesh list -t --json", keys = { "x" = ["echo", "{{.Name}}"] } },
+  { title = "Mine", recipe = "items", command = "list-items --mine", keys = { "x" = ["echo", "{{.Name}}"] } },
   { title = "Weather", command = "curl wttr.in", refresh = 300 },
 ]]
 `))
@@ -32,21 +38,21 @@ sections = [[
 	}
 	row := cfg.Pages[0].Sections[0]
 
-	tmux, err := cfg.resolve(row[0])
+	mine, err := cfg.resolve(row[0])
 	if err != nil {
 		t.Fatal(err)
 	}
-	if tmux.Command != "sesh list -t --json" {
-		t.Errorf("command override lost: %q", tmux.Command)
+	if mine.Command != "list-items --mine" {
+		t.Errorf("command override lost: %q", mine.Command)
 	}
-	if !slices.Equal(tmux.Enter, builtinRecipes["sesh"].Enter) {
-		t.Errorf("enter not inherited from recipe: %v", tmux.Enter)
+	if !slices.Equal(mine.Enter, []string{"open-item", "{{.Name}}"}) {
+		t.Errorf("enter not inherited from recipe: %v", mine.Enter)
 	}
-	if _, ok := tmux.Keys["ctrl+d"]; !ok {
+	if _, ok := mine.Keys["ctrl+d"]; !ok {
 		t.Error("recipe keys dropped when section adds its own")
 	}
-	if _, ok := builtinRecipes["sesh"].Keys["x"]; ok {
-		t.Error("section keys leaked into the builtin recipe")
+	if _, ok := cfg.Recipes["items"].Keys["x"]; ok {
+		t.Error("section keys leaked into the shared recipe")
 	}
 
 	weather, _ := cfg.resolve(row[1])
@@ -58,6 +64,10 @@ sections = [[
 func TestLoadConfigErrors(t *testing.T) {
 	if _, err := LoadConfig(filepath.Join(t.TempDir(), "missing.toml")); err == nil {
 		t.Error("explicit missing config should error")
+	}
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	if _, err := LoadConfig(""); err == nil {
+		t.Error("missing default config should error")
 	}
 	cfg, err := LoadConfig(writeConfig(t, `[[page]]
 sections = [[{ recipe = "nope" }]]`))
@@ -88,9 +98,9 @@ func key(s string) tea.KeyPressMsg {
 
 func TestListPaneParsesFiltersAndChooses(t *testing.T) {
 	p := loadedList(t, Recipe{
-		Command: `echo '[{"Name":"my custom binaries","Attached":1},{"Name":"sesh","Attached":0},{"Name":"hud"}]'`,
+		Command: `echo '[{"Name":"my custom binaries","Attached":1},{"Name":"notes","Attached":0},{"Name":"hud"}]'`,
 		Columns: []string{"Name", "Attached"},
-		Enter:   []string{"sesh", "connect", "{{.Name}}"},
+		Enter:   []string{"open", "{{.Name}}"},
 	})
 	if got := p.cells[0]; !slices.Equal(got, []string{"my custom binaries", "1"}) {
 		t.Errorf("cells = %q", got)
@@ -100,14 +110,14 @@ func TestListPaneParsesFiltersAndChooses(t *testing.T) {
 	}
 
 	p.Update(key("/"))
-	for _, k := range "sesh" {
+	for _, k := range "notes" {
 		p.Update(key(string(k)))
 	}
 	if len(p.visible) != 1 {
 		t.Fatalf("filter kept %d rows, want 1", len(p.visible))
 	}
 	p.Update(key("enter"))
-	if !slices.Equal(p.Chosen(), []string{"sesh", "connect", "sesh"}) {
+	if !slices.Equal(p.Chosen(), []string{"open", "notes"}) {
 		t.Errorf("chosen = %q", p.Chosen())
 	}
 	if p.Filtering() {
@@ -117,7 +127,7 @@ func TestListPaneParsesFiltersAndChooses(t *testing.T) {
 	p.chosen = nil
 	p.Update(key("k"))
 	p.Update(key("enter"))
-	if got := p.Chosen(); len(got) != 3 || got[2] != "my custom binaries" {
+	if got := p.Chosen(); len(got) != 2 || got[1] != "my custom binaries" {
 		t.Errorf("name with spaces must stay one argv element: %q", got)
 	}
 }
@@ -213,13 +223,13 @@ func TestWorktreeRowRendersIntegersAndLists(t *testing.T) {
 	p := loadedList(t, Recipe{
 		Command: `printf '%s' '[{"Number":7235,"Alerts":["bell","activity"],"location":"Cafe\n626 E Ninth St"}]'`,
 		Columns: []string{"Number", "Alerts", "location"},
-		Enter:   []string{"sesh", "worktree", "connect", "{{.Number}}"},
+		Enter:   []string{"gh", "browse", "{{.Number}}"},
 	})
 	if got := p.cells[0]; !slices.Equal(got, []string{"7235", "bell activity", "Cafe 626 E Ninth St"}) {
 		t.Errorf("cells = %q", got)
 	}
 	p.Update(key("enter"))
-	if got := p.Chosen(); len(got) != 4 || got[3] != "7235" {
+	if got := p.Chosen(); len(got) != 3 || got[2] != "7235" {
 		t.Errorf("chosen = %q", got)
 	}
 }

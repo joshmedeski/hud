@@ -19,7 +19,7 @@ func main() {
 		Use:     "hud",
 		Version: version,
 		Short:   "A terminal dashboard built from command recipes",
-		Long:    "hud renders pages of panes, each fed by a shell command. Sesh sessions come from `sesh list --json`.",
+		Long:    "hud renders pages of panes, each fed by a shell command. JSON arrays become tables you can act on; any other output is shown as text.",
 		Args:    cobra.NoArgs,
 		RunE:    run,
 	}

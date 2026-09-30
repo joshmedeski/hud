@@ -4,52 +4,52 @@ columns = ["Icon", "Name", "Path"]
 enter = ["sesh", "connect", "{{.Name}}"]
 keys = { "ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"] }
 
-[recipe.worktree]
+[recipe.nutiliti-worktrees]
+command = "sesh worktree list -r Nutiliti/nutiliti --json"
 columns = ["Number", "State", "Title"]
-enter = ["sesh", "connect", "{{.Path}}"]
+enter = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "Nutiliti/nutiliti"]
+keys = { "o" = ["gh", "browse", "{{.Number}}", "-R", "Nutiliti/nutiliti"] }
+
+[recipe.sesh-worktrees]
+command = "sesh worktree list -r joshmedeski/sesh --json"
+columns = ["Title", "State"]
+enter = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "joshmedeski/sesh"]
+keys = { "o" = ["gh", "browse", "{{.Number}}", "-R", "joshmedeski/sesh"] }
+
+[recipe.calendar]
+command = '''
+ical upcoming --exclude-calendar Birthdays -o json | jq 'map(. as $e | .when = ($e.start_date | fromdateiso8601
+  | strflocaltime(if $e.all_day then "%a %b %e" else "%a %b %e %l:%M %p" end)))'
+'''
+columns = ["when", "title", "calendar", "location"]
+refresh = 300
+
+[recipe.reminders]
+command = '''
+remindctl show --json | jq 'sort_by(.dueDate // "~")
+  | map(.due = (if .dueDate then .dueDate | fromdateiso8601 | strflocaltime("%a %b %e") else "" end))'
+'''
+columns = ["due", "title", "listName"]
+keys = { "c" = ["remindctl", "complete", "{{.id}}"], "o" = ["remindctl", "open", "{{.id}}"] }
+refresh = 300
 
 [[page]]
 title = "Dashboard"
 sections = [
   [
-    { title = "Sessions", recipe = "sesh", command = "sesh list -t --json", columns = [
-      "Icon",
-      "Attached",
-      "Name",
-      "Alerts",
-    ] },
+    { title = "Sessions", recipe = "sesh", command = "sesh list -t --json", columns = ["Icon", "Attached", "Name", "Alerts"] },
     { title = "Weather", command = "curl -s 'wttr.in?0'", refresh = 300 },
   ],
   [
-    { title = "Config + Zoxide", recipe = "sesh", command = "sesh list -c -z -d --json", columns = [
-      "Icon",
-      "Name",
-    ] },
-    { title = "Nutiliti/nutiliti", recipe = "worktree", command = "sesh worktree list -r Nutiliti/nutiliti --json", enter = [
-      "sesh",
-      "worktree",
-      "connect",
-      "{{.Number}}",
-      "-r",
-      "Nutiliti/nutiliti",
-    ] },
-    { title = "joshmedeski/sesh", recipe = "worktree", command = "sesh worktree list -r joshmedeski/sesh --json", columns = [
-      "Title",
-      "State",
-    ], enter = [
-      "sesh",
-      "worktree",
-      "connect",
-      "{{.Number}}",
-      "-r",
-      "joshmedeski/sesh",
-    ] },
+    { title = "Config + Zoxide", recipe = "sesh", command = "sesh list -c -z -d --json", columns = ["Icon", "Name"] },
+    { title = "Nutiliti/nutiliti", recipe = "nutiliti-worktrees" },
+    { title = "joshmedeski/sesh", recipe = "sesh-worktrees" },
   ],
 ]
 
 [[page]]
 title = "Life"
 sections = [
-  [{ title = "Calendars", command = "ical upcoming", refresh = 300 }],
-  [{ title = "Reminders", command = "remindctl", refresh = 300 }],
+  [{ title = "Calendars", recipe = "calendar" }],
+  [{ title = "Reminders", recipe = "reminders" }],
 ]
