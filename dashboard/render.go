@@ -17,7 +17,7 @@ var (
 	colorDimmed       = lipgloss.ANSIColor(8)
 	colorText         = lipgloss.ANSIColor(15)
 	colorWarning      = lipgloss.ANSIColor(11)
-	colorHighlight    = lipgloss.ANSIColor(8)
+	colorHighlight    = lipgloss.ANSIColor(0)
 	colorHighlightDim = lipgloss.ANSIColor(236)
 )
 
