@@ -9,12 +9,14 @@ command = "sesh worktree list -r Nutiliti/nutiliti --json"
 columns = ["Number", "State", "Title"]
 enter = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "Nutiliti/nutiliti"]
 keys = { "o" = ["gh", "browse", "{{.Number}}", "-R", "Nutiliti/nutiliti"] }
+colors = { State = { OPEN = "green", CLOSED = "red", MERGED = "magenta" } }
 
 [recipe.sesh-worktrees]
 command = "sesh worktree list -r joshmedeski/sesh --json"
 columns = ["Title", "State"]
 enter = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "joshmedeski/sesh"]
 keys = { "o" = ["gh", "browse", "{{.Number}}", "-R", "joshmedeski/sesh"] }
+colors = { State = { OPEN = "green", CLOSED = "red", MERGED = "magenta" } }
 
 [recipe.calendar]
 command = '''

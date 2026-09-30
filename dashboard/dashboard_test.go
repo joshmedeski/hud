@@ -4,9 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func writeConfig(t *testing.T, body string) string {
@@ -247,5 +250,98 @@ func TestExampleConfigLoads(t *testing.T) {
 func TestCollapseCarriageReturns(t *testing.T) {
 	if got := collapseCarriageReturns("a\r\n10%\r50%\r100%"); got != "a\n100%" {
 		t.Errorf("got %q", got)
+	}
+}
+
+func TestColumnColors(t *testing.T) {
+	cfg, err := LoadConfig(writeConfig(t, `
+[recipe.prs]
+command = '''echo '[{"State":"OPEN","cal":"Work","color":"#8295AF"},{"State":"CLOSED","cal":"Home","color":"d73a4a"},{"State":"DRAFT","cal":"x"}]' '''
+columns = ["State", "cal"]
+colors = { State = { OPEN = "green", CLOSED = "BrightRed" }, cal = "{{.color}}" }
+
+[[page]]
+sections = [[{ recipe = "prs" }]]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	r, err := cfg.resolve(cfg.Pages[0].Sections[0][0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := loadedList(t, r)
+	want := [][]string{
+		{paint("OPEN", lipgloss.Green), paint("Work", lipgloss.Color("#8295AF"))},
+		{paint("CLOSED", lipgloss.BrightRed), paint("Home", lipgloss.Color("#d73a4a"))},
+		{"DRAFT", "x"},
+	}
+	for i, row := range want {
+		if !slices.Equal(p.painted[i], row) {
+			t.Errorf("row %d = %q, want %q", i, p.painted[i], row)
+		}
+	}
+	if p.cells[0][0] != "OPEN" {
+		t.Errorf("filterable cell text must stay plain, got %q", p.cells[0][0])
+	}
+
+	line := strings.Split(p.View(40, 10, true), "\n")[1]
+	if strings.Count(line, "\x1b[m") != 1 || !strings.HasSuffix(line, "\x1b[m") {
+		t.Errorf("a colored cell must not reset the cursor background: %q", line)
+	}
+
+	cfg.Recipes["prs"] = Recipe{Colors: map[string]any{"State": map[string]any{"OPEN": "grene"}}}
+	if _, err := cfg.resolve(cfg.Pages[0].Sections[0][0]); err == nil {
+		t.Error("unknown color name should error")
+	}
+}
+
+func TestLongColumnTruncatesToKeepOthersVisible(t *testing.T) {
+	p := loadedList(t, Recipe{
+		Command: `echo '[{"Title":"Update Internal Payment Method on Account to Only Show Org-Related","Number":7235,"State":"OPEN"}]'`,
+		Columns: []string{"Title", "Number", "State"},
+		Colors:  map[string]any{"Title": "red"},
+	})
+	for _, line := range strings.Split(p.View(40, 10, false), "\n") {
+		if w := lipgloss.Width(line); w > 40 {
+			t.Errorf("line is %d wide, want <= 40: %q", w, line)
+		}
+	}
+	row := ansi.Strip(strings.Split(p.View(40, 10, false), "\n")[1])
+	if !strings.Contains(row, "…  7235    OPEN") {
+		t.Errorf("title should truncate so Number and State stay visible: %q", row)
+	}
+}
+
+func TestHeaderLabelsAndHiding(t *testing.T) {
+	cfg, err := LoadConfig(writeConfig(t, `
+[recipe.sessions]
+command = '''echo '[{"Name":"hud","WindowNames":["a","b"]},{"Name":"sesh"}]' '''
+columns = ["Name", "WindowNames"]
+labels = { WindowNames = "Windows" }
+
+[[page]]
+sections = [[{ recipe = "sessions" }, { recipe = "sessions", headers = false }]]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	row := cfg.Pages[0].Sections[0]
+	labeled, _ := cfg.resolve(row[0])
+	hidden, _ := cfg.resolve(row[1])
+
+	p := loadedList(t, labeled)
+	if got := ansi.Strip(strings.Split(p.View(40, 10, false), "\n")[0]); got != " Name  Windows" {
+		t.Errorf("header = %q", got)
+	}
+
+	p = loadedList(t, hidden)
+	lines := strings.Split(ansi.Strip(p.View(40, 10, false)), "\n")
+	if len(lines) != 2 || !strings.HasPrefix(lines[0], " hud") {
+		t.Errorf("hidden headers should start with the first row: %q", lines)
+	}
+	p.ClickAt(1)
+	if p.cursor != 1 {
+		t.Errorf("click on second line selected row %d, want 1", p.cursor)
 	}
 }

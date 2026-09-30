@@ -54,6 +54,9 @@ A recipe is a `[recipe.<name>]` table:
 | `enter`   | Command to run on `enter`. hud quits first, then runs it in your terminal.                |
 | `keys`    | Map of key → command. Runs in the background while hud stays open, then the pane reloads. |
 | `refresh` | Reload every N seconds.                                                                   |
+| `colors`  | Map of column → color, or column → table of value → color. See [Colors](#colors).         |
+| `labels`  | Map of column → header text, replacing the generated title.                               |
+| `headers` | Set to `false` to hide the header row.                                                    |
 
 `enter` and `keys` commands are lists of arguments, not shell strings. Each
 argument is a Go template that gets the selected row, so `{{.Name}}` becomes
@@ -62,7 +65,8 @@ quoting is needed.
 
 With `columns` set, the command must print a JSON array of objects. Column
 titles are made readable from the keys (`listName` → "List Name",
-`start_date` → "Start Date"). List values are joined with spaces, and line
+`start_date` → "Start Date"), or set your own with
+`labels = { WindowNames = "Windows" }`. List values are joined with spaces, and line
 breaks are collapsed so each row stays on one line.
 
 ### Example: git worktrees
@@ -92,6 +96,26 @@ field, such as `Number` and `Path`, is still there for templates. With
 
 `?` lists the focused pane's keys and the commands they run.
 
+### Colors
+
+`colors` sets a column's text color. Give a table to color by the cell's value
+(exact match), or a single color for every row:
+
+```toml
+colors = { State = { OPEN = "green", CLOSED = "red" }, Title = "brightwhite" }
+```
+
+A color is an ANSI name (`black` `red` `green` `yellow` `blue` `magenta`
+`cyan` `white`, or `bright` + any of them, like `brightred`), an ANSI number
+(`0`–`255`), or a hex code (`#8295AF`, `8295AF`). A color can also be a
+template, so a hex code already in the JSON can color its row:
+
+```toml
+colors = { title = "{{.color}}" }
+```
+
+Values with no matching color are left uncolored.
+
 ### Example: reshaping output with `jq`
 
 When the raw JSON isn't what you want to show, reshape it inside `command`:
@@ -118,7 +142,8 @@ A section has a `title`, an optional `recipe` to start from, and any recipe
 field to override. This lets several panes share one recipe. When a section
 overrides a field:
 
-- `command`, `columns`, `enter` and `refresh` replace the recipe's value.
+- `command`, `columns`, `colors`, `labels`, `headers`, `enter` and `refresh`
+  replace the recipe's value.
 - `keys` are merged with the recipe's keys.
 
 ```toml

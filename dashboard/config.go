@@ -6,6 +6,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -16,6 +17,9 @@ type Recipe struct {
 	Enter   []string            `toml:"enter"`
 	Keys    map[string][]string `toml:"keys"`
 	Refresh int                 `toml:"refresh"`
+	Colors  map[string]any      `toml:"colors"`
+	Headers *bool               `toml:"headers"`
+	Labels  map[string]string   `toml:"labels"`
 }
 
 type SectionConfig struct {
@@ -59,6 +63,37 @@ func LoadConfig(path string) (Config, error) {
 }
 
 func (c Config) resolve(sc SectionConfig) (Recipe, error) {
+	r, err := c.merge(sc)
+	if err != nil {
+		return r, err
+	}
+	for col, rule := range r.Colors {
+		if err := checkColorRule(rule); err != nil {
+			return r, fmt.Errorf("section %q: colors.%s: %w", sc.Title, col, err)
+		}
+	}
+	return r, nil
+}
+
+func checkColorRule(rule any) error {
+	switch rule := rule.(type) {
+	case string:
+		if !strings.Contains(rule, "{{") && parseColor(rule) == nil {
+			return fmt.Errorf("unknown color %q", rule)
+		}
+	case map[string]any:
+		for _, v := range rule {
+			if err := checkColorRule(v); err != nil {
+				return err
+			}
+		}
+	default:
+		return fmt.Errorf("want a color or a table of value = color, got %v", rule)
+	}
+	return nil
+}
+
+func (c Config) merge(sc SectionConfig) (Recipe, error) {
 	if sc.Use == "" {
 		return sc.Recipe, nil
 	}
@@ -70,6 +105,15 @@ func (c Config) resolve(sc SectionConfig) (Recipe, error) {
 	base.Refresh = cmp.Or(sc.Refresh, base.Refresh)
 	if sc.Columns != nil {
 		base.Columns = sc.Columns
+	}
+	if sc.Colors != nil {
+		base.Colors = sc.Colors
+	}
+	if sc.Headers != nil {
+		base.Headers = sc.Headers
+	}
+	if sc.Labels != nil {
+		base.Labels = sc.Labels
 	}
 	if sc.Enter != nil {
 		base.Enter = sc.Enter

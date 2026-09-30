@@ -1,10 +1,13 @@
 package dashboard
 
 import (
+	"cmp"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"image/color"
 	"os/exec"
+	"slices"
 	"strings"
 	"text/template"
 	"time"
@@ -12,6 +15,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 type Section interface {
@@ -24,9 +28,12 @@ type Section interface {
 func newSection(title string, r Recipe) Section {
 	src := source{title: title, recipe: r, loading: true}
 	if len(r.Columns) > 0 {
-		headers := make([]string, len(r.Columns))
-		for i, col := range r.Columns {
-			headers[i] = humanize(col)
+		var headers []string
+		if r.Headers == nil || *r.Headers {
+			headers = make([]string, len(r.Columns))
+			for i, col := range r.Columns {
+				headers[i] = cmp.Or(r.Labels[col], humanize(col))
+			}
 		}
 		return &listPane{source: src, headers: headers}
 	}
@@ -178,6 +185,7 @@ type listPane struct {
 	headers []string
 	items   []map[string]any
 	cells   [][]string
+	painted [][]string
 	visible []int
 
 	cursor, offset, viewHeight int
@@ -205,10 +213,13 @@ func (p *listPane) parse() {
 		}
 	}
 	p.cells = make([][]string, len(p.items))
+	p.painted = make([][]string, len(p.items))
 	for i, item := range p.items {
 		p.cells[i] = make([]string, len(p.recipe.Columns))
+		p.painted[i] = make([]string, len(p.recipe.Columns))
 		for c, col := range p.recipe.Columns {
 			p.cells[i][c] = cellText(item[col])
+			p.painted[i][c] = paint(p.cells[i][c], cellColor(p.recipe.Colors[col], p.cells[i][c], item))
 		}
 	}
 	p.applyFilter()
@@ -229,6 +240,21 @@ func cellText(v any) string {
 	default:
 		return fmt.Sprint(v)
 	}
+}
+
+func cellColor(rule any, cell string, item map[string]any) color.Color {
+	if byValue, ok := rule.(map[string]any); ok {
+		rule = byValue[cell]
+	}
+	s, _ := rule.(string)
+	if strings.Contains(s, "{{") {
+		out, err := expand([]string{s}, item)
+		if err != nil {
+			return nil
+		}
+		s = out[0]
+	}
+	return parseColor(s)
 }
 
 func (p *listPane) handleKey(msg tea.KeyPressMsg) tea.Cmd {
@@ -352,8 +378,15 @@ func (p *listPane) rowsInView() int {
 	return p.viewHeight
 }
 
+func (p *listPane) headerRows() int {
+	if p.headers == nil {
+		return 0
+	}
+	return 1
+}
+
 func (p *listPane) ClickAt(row int) {
-	row--
+	row -= p.headerRows()
 	if len(p.visible) == 0 || row < 0 {
 		return
 	}
@@ -361,7 +394,7 @@ func (p *listPane) ClickAt(row int) {
 }
 
 func (p *listPane) View(width, height int, focused bool) string {
-	p.viewHeight = max(height-1, 1)
+	p.viewHeight = max(height-p.headerRows(), 1)
 	if s, ok := p.status(); ok {
 		return s
 	}
@@ -369,11 +402,14 @@ func (p *listPane) View(width, height int, focused bool) string {
 		return DimmedStyle().Render("  Nothing to show")
 	}
 
-	widths := p.columnWidths()
-	lines := []string{DimmedStyle().Render(joinCells(p.headers, widths))}
+	widths := p.columnWidths(width)
+	var lines []string
+	if p.headers != nil {
+		lines = append(lines, DimmedStyle().Render(joinCells(p.headers, widths)))
+	}
 	end := min(p.offset+p.viewHeight, len(p.visible))
 	for i := p.offset; i < end; i++ {
-		line := joinCells(p.cells[p.visible[i]], widths)
+		line := joinCells(p.painted[p.visible[i]], widths)
 		if i == p.cursor {
 			line = cursorStyle(focused).Render(padWidth(line, width))
 		}
@@ -382,13 +418,24 @@ func (p *listPane) View(width, height int, focused bool) string {
 	return strings.Join(lines, "\n")
 }
 
-func (p *listPane) columnWidths() []int {
-	widths := make([]int, len(p.headers))
-	for c, header := range p.headers {
-		widths[c] = lipgloss.Width(header)
+func (p *listPane) columnWidths(width int) []int {
+	widths := make([]int, len(p.recipe.Columns))
+	total := 1 + 2*(len(widths)-1)
+	for c := range widths {
+		if p.headers != nil {
+			widths[c] = lipgloss.Width(p.headers[c])
+		}
 		for _, row := range p.cells {
 			widths[c] = max(widths[c], lipgloss.Width(row[c]))
 		}
+		total += widths[c]
+	}
+	for ; total > width; total-- {
+		widest := slices.Index(widths, slices.Max(widths))
+		if widths[widest] <= 1 {
+			break
+		}
+		widths[widest]--
 	}
 	return widths
 }
@@ -413,6 +460,7 @@ func joinCells(cells []string, widths []int) string {
 	var b strings.Builder
 	b.WriteString(" ")
 	for c, cell := range cells {
+		cell = ansi.Truncate(cell, widths[c], "…")
 		b.WriteString(cell)
 		if c < len(cells)-1 {
 			b.WriteString(strings.Repeat(" ", widths[c]-lipgloss.Width(cell)+2))

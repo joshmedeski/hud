@@ -1,8 +1,10 @@
 package dashboard
 
 import (
+	"image/color"
 	"maps"
 	"slices"
+	"strconv"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
@@ -29,6 +31,35 @@ func cursorStyle(focused bool) lipgloss.Style {
 		return lipgloss.NewStyle().Background(colorHighlight)
 	}
 	return lipgloss.NewStyle().Background(colorHighlightDim)
+}
+
+var colorNames = map[string]color.Color{
+	"black": lipgloss.Black, "red": lipgloss.Red, "green": lipgloss.Green, "yellow": lipgloss.Yellow,
+	"blue": lipgloss.Blue, "magenta": lipgloss.Magenta, "cyan": lipgloss.Cyan, "white": lipgloss.White,
+	"brightblack": lipgloss.BrightBlack, "brightred": lipgloss.BrightRed, "brightgreen": lipgloss.BrightGreen,
+	"brightyellow": lipgloss.BrightYellow, "brightblue": lipgloss.BrightBlue, "brightmagenta": lipgloss.BrightMagenta,
+	"brightcyan": lipgloss.BrightCyan, "brightwhite": lipgloss.BrightWhite,
+}
+
+func parseColor(s string) color.Color {
+	s = strings.ToLower(strings.TrimSpace(s))
+	if c, ok := colorNames[s]; ok {
+		return c
+	}
+	if _, err := strconv.ParseUint(s, 16, 32); err == nil && len(s) == 6 {
+		s = "#" + s
+	}
+	if c := lipgloss.Color(s); c != (lipgloss.NoColor{}) {
+		return c
+	}
+	return nil
+}
+
+func paint(s string, c color.Color) string {
+	if c == nil || s == "" {
+		return s
+	}
+	return ansi.Style{}.ForegroundColor(c).String() + s + ansi.Style{}.ForegroundColor(nil).String()
 }
 
 func borderText(s string) string { return DimmedStyle().Render(s) }
