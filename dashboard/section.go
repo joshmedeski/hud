@@ -8,6 +8,7 @@ import (
 	"strings"
 	"text/template"
 	"time"
+	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -23,7 +24,11 @@ type Section interface {
 func newSection(title string, r Recipe) Section {
 	src := source{title: title, recipe: r, loading: true}
 	if len(r.Columns) > 0 {
-		return &listPane{source: src}
+		headers := make([]string, len(r.Columns))
+		for i, col := range r.Columns {
+			headers[i] = humanize(col)
+		}
+		return &listPane{source: src, headers: headers}
 	}
 	return &textPane{source: src}
 }
@@ -170,6 +175,7 @@ func collapseCarriageReturns(s string) string {
 
 type listPane struct {
 	source
+	headers []string
 	items   []map[string]any
 	cells   [][]string
 	visible []int
@@ -364,7 +370,7 @@ func (p *listPane) View(width, height int, focused bool) string {
 	}
 
 	widths := p.columnWidths()
-	lines := []string{DimmedStyle().Render(joinCells(p.recipe.Columns, widths))}
+	lines := []string{DimmedStyle().Render(joinCells(p.headers, widths))}
 	end := min(p.offset+p.viewHeight, len(p.visible))
 	for i := p.offset; i < end; i++ {
 		line := joinCells(p.cells[p.visible[i]], widths)
@@ -377,14 +383,30 @@ func (p *listPane) View(width, height int, focused bool) string {
 }
 
 func (p *listPane) columnWidths() []int {
-	widths := make([]int, len(p.recipe.Columns))
-	for c, col := range p.recipe.Columns {
-		widths[c] = lipgloss.Width(col)
+	widths := make([]int, len(p.headers))
+	for c, header := range p.headers {
+		widths[c] = lipgloss.Width(header)
 		for _, row := range p.cells {
 			widths[c] = max(widths[c], lipgloss.Width(row[c]))
 		}
 	}
 	return widths
+}
+
+func humanize(key string) string {
+	var b strings.Builder
+	prev := ' '
+	for _, r := range strings.ReplaceAll(key, "_", " ") {
+		switch {
+		case prev == ' ':
+			r = unicode.ToUpper(r)
+		case unicode.IsUpper(r) && unicode.IsLower(prev):
+			b.WriteRune(' ')
+		}
+		b.WriteRune(r)
+		prev = r
+	}
+	return b.String()
 }
 
 func joinCells(cells []string, widths []int) string {

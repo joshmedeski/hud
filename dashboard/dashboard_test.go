@@ -181,6 +181,22 @@ func TestPaneNavigationKeys(t *testing.T) {
 	}
 }
 
+func TestHumanize(t *testing.T) {
+	for in, want := range map[string]string{
+		"when":       "When",
+		"listName":   "List Name",
+		"Icon":       "Icon",
+		"GitStatus":  "Git Status",
+		"start_date": "Start Date",
+		"listID":     "List ID",
+		"dueDate":    "Due Date",
+	} {
+		if got := humanize(in); got != want {
+			t.Errorf("humanize(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
+
 func TestLayout(t *testing.T) {
 	if got := splitEvenly(10, 3); !slices.Equal(got, []int{4, 3, 3}) {
 		t.Errorf("splitEvenly = %v", got)
