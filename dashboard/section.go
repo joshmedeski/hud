@@ -18,6 +18,8 @@ import (
 
 type Section interface {
 	Title() string
+	Fit() bool
+	ContentHeight() int
 	Init() tea.Cmd
 	Update(msg tea.Msg) tea.Cmd
 	View(width, height int, focused bool) string
@@ -58,6 +60,8 @@ type source struct {
 }
 
 func (s *source) Title() string { return s.title }
+
+func (s *source) Fit() bool { return s.recipe.Fit }
 
 func (s *source) Init() tea.Cmd { return tea.Batch(s.fetch(nil), s.tick()) }
 
@@ -159,6 +163,13 @@ func (p *textPane) Update(msg tea.Msg) tea.Cmd {
 		p.text = collapseCarriageReturns(string(p.out))
 	}
 	return cmd
+}
+
+func (p *textPane) ContentHeight() int {
+	if _, ok := p.status(); ok || p.text == "" {
+		return 1
+	}
+	return strings.Count(strings.TrimRight(p.text, "\n"), "\n") + 1
 }
 
 func (p *textPane) View(width, height int, focused bool) string {
@@ -392,6 +403,13 @@ func (p *listPane) ClickAt(row int) {
 		return
 	}
 	p.cursor = min(p.offset+row, len(p.visible)-1)
+}
+
+func (p *listPane) ContentHeight() int {
+	if _, ok := p.status(); ok || len(p.items) == 0 {
+		return 1
+	}
+	return p.headerRows() + len(p.items)
 }
 
 func (p *listPane) View(width, height int, focused bool) string {

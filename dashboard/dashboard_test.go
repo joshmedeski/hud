@@ -429,3 +429,28 @@ sections = [
 		t.Error("a nested stack should error")
 	}
 }
+
+func TestFitShrinksStackedPaneToContent(t *testing.T) {
+	stack := func(top Recipe) column {
+		col, err := Config{}.column(SectionConfig{Stack: []SectionConfig{{Recipe: top}, {Recipe: Recipe{Command: "echo rest"}}}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, sec := range col {
+			sec.Update(sec.(*textPane).fetch(nil)())
+		}
+		return col
+	}
+	for _, tc := range []struct {
+		top  Recipe
+		want []int
+	}{
+		{Recipe{Command: "printf 'a\\nb\\n'", Fit: true}, []int{2, 15}},
+		{Recipe{Command: "printf 'a\\nb\\n'"}, []int{9, 8}},
+		{Recipe{Command: "seq 50", Fit: true}, []int{16, 1}},
+	} {
+		if got := stackHeights(18, stack(tc.top)); !slices.Equal(got, tc.want) {
+			t.Errorf("%q fit=%v: heights = %v, want %v", tc.top.Command, tc.top.Fit, got, tc.want)
+		}
+	}
+}

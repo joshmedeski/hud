@@ -20,6 +20,7 @@ type Recipe struct {
 	Colors  map[string]any      `toml:"colors"`
 	Headers *bool               `toml:"headers"`
 	Labels  map[string]string   `toml:"labels"`
+	Fit     bool                `toml:"fit"`
 }
 
 type SectionConfig struct {
@@ -110,6 +111,7 @@ func (c Config) merge(sc SectionConfig) (Recipe, error) {
 	if sc.Colors != nil {
 		base.Colors = sc.Colors
 	}
+	base.Fit = base.Fit || sc.Fit
 	if sc.Headers != nil {
 		base.Headers = sc.Headers
 	}

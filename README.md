@@ -57,6 +57,7 @@ A recipe is a `[recipe.<name>]` table:
 | `colors`  | Map of column → color, or column → table of value → color. See [Colors](#colors).         |
 | `labels`  | Map of column → header text, replacing the generated title.                               |
 | `headers` | Set to `false` to hide the header row.                                                    |
+| `fit`     | In a `stack`, shrink the pane to its content and give the rest to the other panes.         |
 
 `enter` and `keys` commands are lists of arguments, not shell strings. Each
 argument is a Go template that gets the selected row, so `{{.Name}}` becomes
@@ -197,6 +198,10 @@ sections = [
 Calendars and Weather share the left half, one above the other, and Reminders
 fills the right half. Panes are numbered row by row, top to bottom within a
 stack, and `ctrl+j` / `ctrl+k` move through a stack before leaving it.
+
+Stacked panes split the column evenly. Set `fit = true` on a recipe whose
+output is short, and its pane takes only the lines it needs, leaving the rest
+to the other panes in the stack.
 
 ## Keybindings
 

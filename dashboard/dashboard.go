@@ -194,7 +194,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
 				base += len(prev)
 			}
 			line, start := cy-top-1, 0
-			for s, h := range stackHeights(m.rowHeights[r]-2, len(cols[c])) {
+			for s, h := range stackHeights(m.rowHeights[r]-2, cols[c]) {
 				if line < start+h || s == len(cols[c])-1 {
 					m.focus = base + s
 					if l, ok := cols[c][s].(*listPane); ok {
@@ -212,8 +212,30 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
 	return m
 }
 
-func stackHeights(inner, n int) []int {
-	return splitEvenly(max(inner-(n-1), n), n)
+func stackHeights(inner int, panes column) []int {
+	remaining := max(inner-(len(panes)-1), len(panes))
+	heights := make([]int, len(panes))
+	var flex []int
+	fitted := 0
+	for i, p := range panes {
+		if p.Fit() {
+			fitted++
+		} else {
+			flex = append(flex, i)
+		}
+	}
+	for i, p := range panes {
+		if !p.Fit() {
+			continue
+		}
+		fitted--
+		heights[i] = max(min(p.ContentHeight(), remaining-len(flex)-fitted), 1)
+		remaining -= heights[i]
+	}
+	for i, h := range splitEvenly(max(remaining, len(flex)), len(flex)) {
+		heights[flex[i]] = h
+	}
+	return heights
 }
 
 func paneTotal(cols []column) int {
@@ -388,7 +410,7 @@ func (m Model) viewPage() string {
 		fc := make([]frameColumn, len(cols))
 		for i, panes := range cols {
 			w := m.rowWidths[r][i]
-			heights := stackHeights(m.rowHeights[r]-2, len(panes))
+			heights := stackHeights(m.rowHeights[r]-2, panes)
 			fc[i] = frameColumn{width: w, panes: make([]framePane, len(panes))}
 			for s, sec := range panes {
 				focused := m.focus == base
