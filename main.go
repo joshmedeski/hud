@@ -23,6 +23,7 @@ func main() {
 		Args:    cobra.NoArgs,
 		RunE:    run,
 	}
+	root.Flags().StringP("page", "p", "", "title of the page to open first")
 	root.Flags().StringP("config", "C", "", "path to config file (default $XDG_CONFIG_HOME/hud/hud.toml)")
 
 	if err := fang.Execute(context.Background(), root, fang.WithColorSchemeFunc(fang.AnsiColorScheme), fang.WithoutVersion()); err != nil {
@@ -39,6 +40,11 @@ func run(cmd *cobra.Command, _ []string) error {
 	m, err := dashboard.New(cfg)
 	if err != nil {
 		return err
+	}
+	if title, _ := cmd.Flags().GetString("page"); title != "" {
+		if m, err = m.OpenPage(title); err != nil {
+			return err
+		}
 	}
 	result, err := tea.NewProgram(m).Run()
 	if err != nil {

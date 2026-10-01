@@ -2,6 +2,7 @@ package dashboard
 
 import (
 	"fmt"
+	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -85,6 +86,16 @@ func (c Config) column(sc SectionConfig, fs feeds) (column, error) {
 }
 
 func (m Model) Action() []string { return m.action }
+
+func (m Model) OpenPage(title string) (Model, error) {
+	for i, p := range m.pages {
+		if strings.EqualFold(p.title, title) {
+			m.page = i
+			return m.withLayout(), nil
+		}
+	}
+	return m, fmt.Errorf("no page titled %q", title)
+}
 
 func useGraphemeWidths() tea.Msg {
 	return tea.ModeReportMsg{Mode: ansi.ModeUnicodeCore, Value: ansi.ModeSet}

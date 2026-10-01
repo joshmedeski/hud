@@ -527,3 +527,19 @@ sections = [[{ title = "All", recipe = "items" }, { title = "Later", command = "
 		t.Errorf("shared command ran %d times, want 1", strings.Count(string(b), "x"))
 	}
 }
+
+func TestOpenPage(t *testing.T) {
+	m, err := New(Config{Pages: []PageConfig{
+		{Sections: [][]SectionConfig{{{}}}},
+		{Title: "Nutiliti", Sections: [][]SectionConfig{{{}}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m, err = m.OpenPage("nutiliti"); err != nil || m.page != 1 {
+		t.Errorf("page = %d, err = %v", m.page, err)
+	}
+	if _, err := m.OpenPage("nope"); err == nil {
+		t.Error("want error for unknown page")
+	}
+}

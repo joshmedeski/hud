@@ -42,6 +42,7 @@ just build   # installs to $GOPATH/bin/hud
 
 hud reads `$XDG_CONFIG_HOME/hud/hud.toml` (or `~/.config/hud/hud.toml`).
 Use `hud -C path/to/hud.toml` to load a different file.
+Use `hud --page "Nutiliti"` (or `-p`) to open on a page by its title.
 
 ## Recipes
 
