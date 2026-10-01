@@ -38,7 +38,8 @@ just build   # installs to $GOPATH/bin/hud
 - Every pane is a **recipe**: a command, plus optional instructions for turning
   its output into a table and acting on the selected row.
 - Commands run through `sh -c` the first time their page is shown, again when
-  you press `r`, and every `refresh` seconds if that's set.
+  you press `r` (focused pane) or `R` (whole page), and every `refresh`
+  seconds if that's set.
 
 hud reads `$XDG_CONFIG_HOME/hud/hud.toml` (or `~/.config/hud/hud.toml`).
 Use `hud -C path/to/hud.toml` to load a different file.
@@ -194,7 +195,7 @@ sections = [[
 ]]
 ```
 
-The command runs once, and `r`, `refresh` or a `keys` action reloads every
+The command runs once, and `r`, `R`, `refresh` or a `keys` action reloads every
 pane that shares it. When panes set different `refresh` values, the shortest
 one wins.
 
@@ -232,6 +233,7 @@ to the other panes in the stack.
 | `enter`                               | run the recipe's `enter` command      |
 | `/`                                   | filter the table (`esc` clears)       |
 | `r`                                   | reload the pane                       |
+| `R`                                   | reload every pane on the page         |
 | click                                 | focus pane and select row             |
 | `?`                                   | help, including the pane's `keys`     |
 | `q` / `esc`                           | quit                                  |

@@ -23,6 +23,7 @@ type Section interface {
 	Init() tea.Cmd
 	Update(msg tea.Msg) tea.Cmd
 	View(width, height int, focused bool) string
+	src() *source
 }
 
 func newSection(title string, r Recipe, fs feeds) Section {
@@ -84,6 +85,8 @@ type source struct {
 }
 
 func (s *source) Title() string { return s.title }
+
+func (s *source) src() *source { return s }
 
 func (s *source) Fit() bool { return s.recipe.Fit }
 

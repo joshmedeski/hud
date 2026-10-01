@@ -171,7 +171,7 @@ var footerBinds = []keybind{
 	{"h/l", "pane"},
 	{"enter", "open"},
 	{"/", "filter"},
-	{"r", "refresh"},
+	{"r/R", "refresh"},
 	{"1-9", "jump"},
 	{"q", "quit"},
 }
@@ -219,7 +219,8 @@ func renderHelp(width, height int, pages bool, extra map[string][]string) string
 		{"j/k ↑/↓", "move"},
 		{"enter", "open"},
 		{"/", "filter"},
-		{"r", "refresh"},
+		{"r", "refresh pane"},
+		{"R", "refresh page"},
 		{"h/l ←/→", "previous / next pane"},
 		{"ctrl+h / ctrl+l", "previous / next pane"},
 		{"ctrl+j / ctrl+k", "focus pane below / above"},

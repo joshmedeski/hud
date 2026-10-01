@@ -563,3 +563,21 @@ func TestHidePages(t *testing.T) {
 		t.Errorf("page tabs still shown:\n%s", view)
 	}
 }
+
+func TestShiftRReloadsEachFeedOnPageOnce(t *testing.T) {
+	m, err := New(Config{Pages: []PageConfig{{Sections: [][]SectionConfig{
+		{{Recipe: Recipe{Command: "echo a"}}, {Recipe: Recipe{Command: "echo a"}}},
+		{{Recipe: Recipe{Command: "echo b"}}},
+	}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, cmd := m.Update(key("R"))
+	if cmd == nil {
+		t.Fatal("R returned no command")
+	}
+	batch, ok := cmd().(tea.BatchMsg)
+	if !ok || len(batch) != 2 {
+		t.Errorf("want 2 reloads, got %#v", batch)
+	}
+}

@@ -130,6 +130,22 @@ func (m Model) initPage() tea.Cmd {
 	return tea.Batch(cmds...)
 }
 
+func (m Model) reloadPage() tea.Cmd {
+	seen := map[*feed]bool{}
+	var cmds []tea.Cmd
+	for _, cols := range m.rows() {
+		for _, panes := range cols {
+			for _, sec := range panes {
+				if s := sec.src(); !seen[s.feed] {
+					seen[s.feed] = true
+					cmds = append(cmds, s.fetch(nil))
+				}
+			}
+		}
+	}
+	return tea.Batch(cmds...)
+}
+
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
@@ -171,6 +187,8 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		m.quit = true
 		return m, tea.Quit
+	case "R", "shift+r":
+		return m, m.reloadPage()
 	case "tab":
 		if m.hidePages {
 			return m, nil
