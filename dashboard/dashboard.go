@@ -24,6 +24,7 @@ type Model struct {
 	width, height int
 	tooSmall      bool
 	showHelp      bool
+	hidePages     bool
 	quit          bool
 	action        []string
 
@@ -97,6 +98,18 @@ func (m Model) OpenPage(title string) (Model, error) {
 	return m, fmt.Errorf("no page titled %q", title)
 }
 
+func (m Model) HidePages() Model {
+	m.hidePages = true
+	return m.withLayout()
+}
+
+func (m Model) headerHeight() int {
+	if m.hidePages {
+		return 0
+	}
+	return 2
+}
+
 func useGraphemeWidths() tea.Msg {
 	return tea.ModeReportMsg{Mode: ansi.ModeUnicodeCore, Value: ansi.ModeSet}
 }
@@ -159,10 +172,16 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.quit = true
 		return m, tea.Quit
 	case "tab":
+		if m.hidePages {
+			return m, nil
+		}
 		m.page, m.focus = (m.page+1)%len(m.pages), 0
 		m = m.withLayout()
 		return m, m.initPage()
 	case "shift+tab":
+		if m.hidePages {
+			return m, nil
+		}
 		m.page, m.focus = (m.page-1+len(m.pages))%len(m.pages), 0
 		m = m.withLayout()
 		return m, m.initPage()
@@ -204,7 +223,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
 	if m.showHelp || e.Button != tea.MouseLeft {
 		return m
 	}
-	cy := e.Y - 2
+	cy := e.Y - m.headerHeight()
 	top, base := 0, 0
 	for r, cols := range m.rows() {
 		if cy >= top && cy < top+m.rowHeights[r] {
@@ -367,7 +386,7 @@ func (m Model) moveFocusRow(dir int) Model {
 }
 
 func (m Model) withLayout() Model {
-	m.contentHeight = max(m.height-3, 1)
+	m.contentHeight = max(m.height-m.headerHeight()-1, 1)
 	rows := m.rows()
 	m.rowWidths = make([][]int, len(rows))
 	for r, cols := range rows {
@@ -396,17 +415,20 @@ func (m Model) View() tea.View {
 		return tea.NewView("Terminal too small for hud")
 	}
 
-	titles := make([]string, len(m.pages))
-	for i, p := range m.pages {
-		titles[i] = p.title
+	var parts []string
+	if !m.hidePages {
+		titles := make([]string, len(m.pages))
+		for i, p := range m.pages {
+			titles[i] = p.title
+		}
+		parts = append(parts, renderHeader(m.page, m.width, titles))
 	}
-	header := renderHeader(m.page, m.width, titles)
 
 	filtering, query := false, ""
 	if l, ok := m.focused().(*listPane); ok {
 		filtering, query = l.Filtering(), l.FilterQuery()
 	}
-	footer := renderFooter(m.width, filtering, query)
+	footer := renderFooter(m.width, !m.hidePages, filtering, query)
 
 	var content string
 	if m.showHelp {
@@ -414,12 +436,12 @@ func (m Model) View() tea.View {
 		if l, ok := m.focused().(*listPane); ok {
 			keys = l.recipe.Keys
 		}
-		content = renderHelp(m.width, m.contentHeight, keys)
+		content = renderHelp(m.width, m.contentHeight, !m.hidePages, keys)
 	} else {
 		content = m.viewPage()
 	}
 
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Top, header, content, footer))
+	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Top, append(parts, content, footer)...))
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v

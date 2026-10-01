@@ -543,3 +543,23 @@ func TestOpenPage(t *testing.T) {
 		t.Error("want error for unknown page")
 	}
 }
+
+func TestHidePages(t *testing.T) {
+	m, err := New(Config{Pages: []PageConfig{
+		{Title: "One", Sections: [][]SectionConfig{{{}}}},
+		{Title: "Two", Sections: [][]SectionConfig{{{}}}},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	m = m.HidePages()
+	next, _ := m.Update(key("tab"))
+	m = next.(Model)
+	if m.page != 0 {
+		t.Errorf("tab moved to page %d", m.page)
+	}
+	view := ansi.Strip(m.View().Content)
+	if strings.Contains(view, "Two") || strings.Contains(view, "tab") {
+		t.Errorf("page tabs still shown:\n%s", view)
+	}
+}

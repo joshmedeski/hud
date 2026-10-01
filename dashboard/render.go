@@ -167,7 +167,6 @@ func renderHeader(active, width int, tabs []string) string {
 type keybind struct{ key, label string }
 
 var footerBinds = []keybind{
-	{"tab", "page"},
 	{"j/k", "move"},
 	{"h/l", "pane"},
 	{"enter", "open"},
@@ -177,7 +176,7 @@ var footerBinds = []keybind{
 	{"q", "quit"},
 }
 
-func renderFooter(width int, filtering bool, query string) string {
+func renderFooter(width int, pages, filtering bool, query string) string {
 	if filtering {
 		line := strings.Join([]string{
 			accentStyle().Render("filter:") + " " + TextStyle().Render(query),
@@ -194,9 +193,12 @@ func renderFooter(width int, filtering bool, query string) string {
 		return accentStyle().Render(b.key)
 	}
 	line := func(labels bool) string {
-		parts := make([]string, len(footerBinds))
-		for i, b := range footerBinds {
-			parts[i] = format(b, labels)
+		var parts []string
+		if pages {
+			parts = append(parts, format(keybind{"tab", "page"}, labels))
+		}
+		for _, b := range footerBinds {
+			parts = append(parts, format(b, labels))
 		}
 		left := strings.Join(parts, separator)
 		right := format(keybind{"?", "help"}, labels)
@@ -208,9 +210,12 @@ func renderFooter(width int, filtering bool, query string) string {
 	return padWidth(line(false), width)
 }
 
-func renderHelp(width, height int, extra map[string][]string) string {
-	binds := []keybind{
-		{"tab / shift+tab", "next / previous page"},
+func renderHelp(width, height int, pages bool, extra map[string][]string) string {
+	var binds []keybind
+	if pages {
+		binds = append(binds, keybind{"tab / shift+tab", "next / previous page"})
+	}
+	binds = append(binds, []keybind{
 		{"j/k ↑/↓", "move"},
 		{"enter", "open"},
 		{"/", "filter"},
@@ -222,7 +227,7 @@ func renderHelp(width, height int, extra map[string][]string) string {
 		{"click", "focus pane and select row"},
 		{"?", "close help"},
 		{"q / esc", "quit"},
-	}
+	}...)
 	for _, key := range slices.Sorted(maps.Keys(extra)) {
 		binds = append(binds, keybind{key, strings.Join(extra[key], " ")})
 	}

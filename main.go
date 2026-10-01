@@ -24,6 +24,7 @@ func main() {
 		RunE:    run,
 	}
 	root.Flags().StringP("page", "p", "", "title of the page to open first")
+	root.Flags().Bool("no-pages", false, "hide the page tabs and stay on one page")
 	root.Flags().StringP("config", "C", "", "path to config file (default $XDG_CONFIG_HOME/hud/hud.toml)")
 
 	if err := fang.Execute(context.Background(), root, fang.WithColorSchemeFunc(fang.AnsiColorScheme), fang.WithoutVersion()); err != nil {
@@ -45,6 +46,9 @@ func run(cmd *cobra.Command, _ []string) error {
 		if m, err = m.OpenPage(title); err != nil {
 			return err
 		}
+	}
+	if hide, _ := cmd.Flags().GetBool("no-pages"); hide {
+		m = m.HidePages()
 	}
 	result, err := tea.NewProgram(m).Run()
 	if err != nil {
