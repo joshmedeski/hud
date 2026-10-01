@@ -37,8 +37,8 @@ just build   # installs to $GOPATH/bin/hud
   panes in a row sit side by side. Space is split evenly.
 - Every pane is a **recipe**: a command, plus optional instructions for turning
   its output into a table and acting on the selected row.
-- Commands run through `sh -c` when the dashboard starts, again when you press
-  `r`, and every `refresh` seconds if that's set.
+- Commands run through `sh -c` the first time their page is shown, again when
+  you press `r`, and every `refresh` seconds if that's set.
 
 hud reads `$XDG_CONFIG_HOME/hud/hud.toml` (or `~/.config/hud/hud.toml`).
 Use `hud -C path/to/hud.toml` to load a different file.
@@ -58,6 +58,7 @@ A recipe is a `[recipe.<name>]` table:
 | `labels`  | Map of column → header text, replacing the generated title.                               |
 | `headers` | Set to `false` to hide the header row.                                                    |
 | `fit`     | In a `stack`, shrink the pane to its content and give the rest to the other panes.         |
+| `where`   | Map of JSON key → value (or list of values). Only rows that match every key are shown.    |
 
 `enter` and `keys` commands are lists of arguments, not shell strings. Each
 argument is a Go template that gets the selected row, so `{{.Name}}` becomes
@@ -144,8 +145,8 @@ A section has a `title`, an optional `recipe` to start from, and any recipe
 field to override. This lets several panes share one recipe. When a section
 overrides a field:
 
-- `command`, `columns`, `colors`, `labels`, `headers`, `enter` and `refresh`
-  replace the recipe's value.
+- `command`, `columns`, `colors`, `labels`, `headers`, `where`, `enter` and
+  `refresh` replace the recipe's value.
 - `keys` are merged with the recipe's keys.
 
 ```toml
@@ -180,6 +181,20 @@ The first page has two rows of two panes each. `Sessions` and
 `Config + Zoxide` share the `sesh` recipe with different commands and columns.
 `Weather` has no recipe and no columns, so its output (colors included) is
 shown as-is. The second page stacks two full-width panes.
+
+Panes with the same `command` share one run of it, even across pages. Use
+`where` to show a different slice of that output in each pane:
+
+```toml
+sections = [[
+  { title = "Open", recipe = "nutiliti-worktrees", where = { State = "OPEN" } },
+  { title = "Done", recipe = "nutiliti-worktrees", where = { State = ["MERGED", "CLOSED"] } },
+]]
+```
+
+The command runs once, and `r`, `refresh` or a `keys` action reloads every
+pane that shares it. When panes set different `refresh` values, the shortest
+one wins.
 
 To stack panes inside one column of a row, give the row a `stack` of sections
 instead of a single section:

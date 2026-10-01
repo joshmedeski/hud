@@ -33,12 +33,13 @@ type Model struct {
 
 func New(cfg Config) (Model, error) {
 	var pages []page
+	fs := feeds{}
 	for i, pc := range cfg.Pages {
 		var rows [][]column
 		for _, rowCfg := range pc.Sections {
 			var row []column
 			for _, sc := range rowCfg {
-				col, err := cfg.column(sc)
+				col, err := cfg.column(sc, fs)
 				if err != nil {
 					return Model{}, err
 				}
@@ -64,7 +65,7 @@ func New(cfg Config) (Model, error) {
 	return m.withLayout(), nil
 }
 
-func (c Config) column(sc SectionConfig) (column, error) {
+func (c Config) column(sc SectionConfig, fs feeds) (column, error) {
 	members := sc.Stack
 	if len(members) == 0 {
 		members = []SectionConfig{sc}
@@ -78,7 +79,7 @@ func (c Config) column(sc SectionConfig) (column, error) {
 		if err != nil {
 			return nil, err
 		}
-		col = append(col, newSection(member.Title, r))
+		col = append(col, newSection(member.Title, r, fs))
 	}
 	return col, nil
 }
@@ -90,9 +91,17 @@ func useGraphemeWidths() tea.Msg {
 }
 
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{useGraphemeWidths}
-	for _, sec := range m.allSections() {
-		cmds = append(cmds, sec.Init())
+	return tea.Batch(useGraphemeWidths, m.initPage())
+}
+
+func (m Model) initPage() tea.Cmd {
+	var cmds []tea.Cmd
+	for _, cols := range m.rows() {
+		for _, panes := range cols {
+			for _, sec := range panes {
+				cmds = append(cmds, sec.Init())
+			}
+		}
 	}
 	return tea.Batch(cmds...)
 }
@@ -140,10 +149,12 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "tab":
 		m.page, m.focus = (m.page+1)%len(m.pages), 0
-		return m.withLayout(), nil
+		m = m.withLayout()
+		return m, m.initPage()
 	case "shift+tab":
 		m.page, m.focus = (m.page-1+len(m.pages))%len(m.pages), 0
-		return m.withLayout(), nil
+		m = m.withLayout()
+		return m, m.initPage()
 	}
 
 	switch {

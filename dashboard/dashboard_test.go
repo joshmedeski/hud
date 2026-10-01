@@ -84,7 +84,7 @@ sections = [[{ recipe = "nope" }]]`))
 
 func loadedList(t *testing.T, r Recipe) *listPane {
 	t.Helper()
-	p := newSection("test", r).(*listPane)
+	p := newSection("test", r, nil).(*listPane)
 	p.Update(p.fetch(nil)())
 	if p.err != nil {
 		t.Fatal(p.err)
@@ -136,7 +136,7 @@ func TestListPaneParsesFiltersAndChooses(t *testing.T) {
 }
 
 func TestListPaneReportsBadJSON(t *testing.T) {
-	p := newSection("test", Recipe{Command: "echo nope", Columns: []string{"Name"}}).(*listPane)
+	p := newSection("test", Recipe{Command: "echo nope", Columns: []string{"Name"}}, nil).(*listPane)
 	p.Update(p.fetch(nil)())
 	if p.err == nil {
 		t.Error("non-JSON output should surface an error")
@@ -435,7 +435,7 @@ sections = [
 
 func TestFitShrinksStackedPaneToContent(t *testing.T) {
 	stack := func(top Recipe) column {
-		col, err := Config{}.column(SectionConfig{Stack: []SectionConfig{{Recipe: top}, {Recipe: Recipe{Command: "echo rest"}}}})
+		col, err := Config{}.column(SectionConfig{Stack: []SectionConfig{{Recipe: top}, {Recipe: Recipe{Command: "echo rest"}}}}, nil)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -455,5 +455,75 @@ func TestFitShrinksStackedPaneToContent(t *testing.T) {
 		if got := stackHeights(20, stack(tc.top)); !slices.Equal(got, tc.want) {
 			t.Errorf("%q fit=%v: heights = %v, want %v", tc.top.Command, tc.top.Fit, got, tc.want)
 		}
+	}
+}
+
+func drain(m Model, cmd tea.Cmd) Model {
+	if cmd == nil {
+		return m
+	}
+	switch msg := cmd().(type) {
+	case tea.BatchMsg:
+		for _, c := range msg {
+			m = drain(m, c)
+		}
+	default:
+		next, more := m.Update(msg)
+		m = drain(next.(Model), more)
+	}
+	return m
+}
+
+func TestSharedFeedLoadsOnceAndLazily(t *testing.T) {
+	dir := t.TempDir()
+	runs, later := filepath.Join(dir, "runs"), filepath.Join(dir, "later")
+	cfg, err := LoadConfig(writeConfig(t, `
+[recipe.items]
+command = '''echo x >> `+runs+`; echo '[{"Name":"a","State":"OPEN"},{"Name":"b","State":"MERGED"},{"Name":"c","State":"CLOSED"}]' '''
+columns = ["Name"]
+
+[[page]]
+sections = [[
+  { title = "Open", recipe = "items", where = { State = "OPEN" } },
+  { title = "Done", recipe = "items", where = { State = ["MERGED", "CLOSED"] } },
+]]
+
+[[page]]
+sections = [[{ title = "All", recipe = "items" }, { title = "Later", command = "touch `+later+`" }]]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m = drain(m, m.Init())
+
+	names := func(sec Section) string {
+		var out []string
+		for _, item := range sec.(*listPane).items {
+			out = append(out, item["Name"].(string))
+		}
+		return strings.Join(out, ",")
+	}
+	secs := m.allSections()
+	if got := names(secs[0]) + " " + names(secs[1]); got != "a b,c" {
+		t.Errorf("filtered panes = %q", got)
+	}
+	if _, err := os.Stat(later); err == nil {
+		t.Error("second page loaded before it was shown")
+	}
+
+	next, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	m = drain(next.(Model), cmd)
+	if _, err := os.Stat(later); err != nil {
+		t.Error("second page didn't load when shown")
+	}
+	if got := names(secs[2]); got != "a,b,c" {
+		t.Errorf("shared feed not replayed on the new page: %q", got)
+	}
+	if b, _ := os.ReadFile(runs); string(b) != "x\n" {
+		t.Errorf("shared command ran %d times, want 1", strings.Count(string(b), "x"))
 	}
 }

@@ -25,8 +25,8 @@ type Section interface {
 	View(width, height int, focused bool) string
 }
 
-func newSection(title string, r Recipe) Section {
-	src := source{title: title, recipe: r, loading: true}
+func newSection(title string, r Recipe, fs feeds) Section {
+	src := source{title: title, recipe: r, feed: fs.join(r), loading: true}
 	if len(r.Columns) > 0 {
 		var headers []string
 		if r.Headers == nil || *r.Headers {
@@ -44,16 +44,40 @@ func newSection(title string, r Recipe) Section {
 }
 
 type loadedMsg struct {
-	src *source
-	out []byte
-	err error
+	feed *feed
+	out  []byte
+	err  error
 }
 
-type refreshMsg struct{ src *source }
+type refreshMsg struct{ feed *feed }
+
+type feed struct {
+	refresh int
+	owner   *source
+	last    *loadedMsg
+}
+
+type feeds map[string]*feed
+
+func (fs feeds) join(r Recipe) *feed {
+	f := fs[r.Command]
+	if f == nil {
+		f = &feed{}
+		if fs != nil {
+			fs[r.Command] = f
+		}
+	}
+	if r.Refresh > 0 && (f.refresh == 0 || r.Refresh < f.refresh) {
+		f.refresh = r.Refresh
+	}
+	return f
+}
 
 type source struct {
 	title   string
 	recipe  Recipe
+	feed    *feed
+	started bool
 	loading bool
 	out     []byte
 	err     error
@@ -63,38 +87,53 @@ func (s *source) Title() string { return s.title }
 
 func (s *source) Fit() bool { return s.recipe.Fit }
 
-func (s *source) Init() tea.Cmd { return tea.Batch(s.fetch(nil), s.tick()) }
+func (s *source) Init() tea.Cmd {
+	if s.started {
+		return nil
+	}
+	s.started = true
+	switch {
+	case s.feed.owner == nil:
+		s.feed.owner = s
+		return tea.Batch(s.fetch(nil), s.tick())
+	case s.feed.last != nil:
+		last := *s.feed.last
+		return func() tea.Msg { return last }
+	}
+	return nil
+}
 
 func (s *source) fetch(before []string) tea.Cmd {
 	return func() tea.Msg {
 		if len(before) > 0 {
 			if err := runArgv(before); err != nil {
-				return loadedMsg{src: s, err: err}
+				return loadedMsg{feed: s.feed, err: err}
 			}
 		}
 		out, err := runShell(s.recipe.Command)
-		return loadedMsg{src: s, out: out, err: err}
+		return loadedMsg{feed: s.feed, out: out, err: err}
 	}
 }
 
 func (s *source) tick() tea.Cmd {
-	if s.recipe.Refresh <= 0 {
+	if s.feed.refresh <= 0 {
 		return nil
 	}
-	return tea.Tick(time.Duration(s.recipe.Refresh)*time.Second, func(time.Time) tea.Msg {
-		return refreshMsg{src: s}
+	return tea.Tick(time.Duration(s.feed.refresh)*time.Second, func(time.Time) tea.Msg {
+		return refreshMsg{feed: s.feed}
 	})
 }
 
 func (s *source) update(msg tea.Msg) (cmd tea.Cmd, loaded bool) {
 	switch msg := msg.(type) {
 	case loadedMsg:
-		if msg.src == s {
+		if msg.feed == s.feed {
+			s.feed.last = &msg
 			s.loading, s.out, s.err = false, msg.out, msg.err
 			return nil, true
 		}
 	case refreshMsg:
-		if msg.src == s {
+		if msg.feed == s.feed && s.feed.owner == s {
 			return tea.Batch(s.fetch(nil), s.tick()), false
 		}
 	case tea.KeyPressMsg:
@@ -224,6 +263,7 @@ func (p *listPane) parse() {
 			p.err = fmt.Errorf("parsing %q output as a JSON array: %w", p.recipe.Command, err)
 		}
 	}
+	p.items = slices.DeleteFunc(p.items, func(item map[string]any) bool { return !matches(item, p.recipe.Where) })
 	p.cells = make([][]string, len(p.items))
 	p.painted = make([][]string, len(p.items))
 	for i, item := range p.items {
@@ -252,6 +292,20 @@ func cellText(v any) string {
 	default:
 		return fmt.Sprint(v)
 	}
+}
+
+func matches(item map[string]any, where map[string]any) bool {
+	for key, want := range where {
+		options, ok := want.([]any)
+		if !ok {
+			options = []any{want}
+		}
+		got := cellText(item[key])
+		if !slices.ContainsFunc(options, func(o any) bool { return cellText(o) == got }) {
+			return false
+		}
+	}
+	return true
 }
 
 func cellStyle(rule any, cell string, item map[string]any) string {

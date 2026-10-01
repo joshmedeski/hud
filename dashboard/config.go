@@ -21,6 +21,7 @@ type Recipe struct {
 	Headers *bool               `toml:"headers"`
 	Labels  map[string]string   `toml:"labels"`
 	Fit     bool                `toml:"fit"`
+	Where   map[string]any      `toml:"where"`
 }
 
 type SectionConfig struct {
@@ -117,6 +118,9 @@ func (c Config) merge(sc SectionConfig) (Recipe, error) {
 	}
 	if sc.Labels != nil {
 		base.Labels = sc.Labels
+	}
+	if sc.Where != nil {
+		base.Where = sc.Where
 	}
 	if sc.Enter != nil {
 		base.Enter = sc.Enter
