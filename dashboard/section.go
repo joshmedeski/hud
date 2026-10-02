@@ -44,6 +44,42 @@ func newSection(title string, r Recipe, fs feeds) Section {
 	return &textPane{source: src}
 }
 
+type tabbed struct {
+	Section
+	tabs   []Section
+	active int
+}
+
+func current(s Section) Section {
+	if t, ok := s.(*tabbed); ok {
+		return t.Section
+	}
+	return s
+}
+
+func (t *tabbed) Update(msg tea.Msg) tea.Cmd {
+	cmds := make([]tea.Cmd, len(t.tabs))
+	for i, tab := range t.tabs {
+		cmds[i] = tab.Update(msg)
+	}
+	return tea.Batch(cmds...)
+}
+
+func (t *tabbed) cycle(delta int) tea.Cmd {
+	n := len(t.tabs)
+	t.active = ((t.active+delta)%n + n) % n
+	t.Section = t.tabs[t.active]
+	return t.Init()
+}
+
+func (t *tabbed) titles() []string {
+	out := make([]string, len(t.tabs))
+	for i, tab := range t.tabs {
+		out[i] = tab.Title()
+	}
+	return out
+}
+
 type loadedMsg struct {
 	feed *feed
 	out  []byte

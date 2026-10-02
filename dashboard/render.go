@@ -87,7 +87,9 @@ func borderText(s string) string { return DimmedStyle().Render(s) }
 var separator = borderText(" │ ")
 
 type framePane struct {
-	title   string
+	number  int
+	tabs    []string
+	active  int
 	content string
 	height  int
 	focused bool
@@ -103,7 +105,7 @@ func (p framePane) box(width int) []string {
 	if p.focused {
 		border = lipgloss.NewStyle().Foreground(colorAccent)
 	}
-	lines := []string{border.Render("┌") + frameSegment(p.title, width, p.focused) + border.Render("┐")}
+	lines := []string{border.Render("┌") + p.titleBar(width) + border.Render("┐")}
 	content := strings.Split(p.content, "\n")
 	for row := range p.height {
 		line := ""
@@ -133,17 +135,28 @@ func renderFrame(cols []frameColumn, height int) string {
 	return strings.Join(rows, "\n")
 }
 
-func frameSegment(title string, width int, focused bool) string {
-	border, text := DimmedStyle(), DimmedStyle()
-	if focused {
-		border, text = lipgloss.NewStyle().Foreground(colorAccent), accentStyle()
+func (p framePane) titleBar(width int) string {
+	border, text, current := DimmedStyle(), DimmedStyle(), DimmedStyle()
+	if len(p.tabs) > 1 {
+		current = TextStyle()
+	}
+	if p.focused {
+		border, text, current = lipgloss.NewStyle().Foreground(colorAccent), accentStyle(), accentStyle()
 	}
 	if width < 4 {
 		return border.Render(strings.Repeat("─", max(width, 1)))
 	}
+	tabs := make([]string, len(p.tabs))
+	for i, tab := range p.tabs {
+		tabs[i] = DimmedStyle().Render(tab)
+		if i == p.active {
+			tabs[i] = current.Render(tab)
+		}
+	}
+	title := text.Render(strconv.Itoa(p.number)+" ") + strings.Join(tabs, DimmedStyle().Render(" - "))
 	title = ansi.Truncate(title, width-4, "…")
 	filler := max(width-3-lipgloss.Width(title), 1)
-	return border.Render("─") + text.Render(" "+title+" ") + border.Render(strings.Repeat("─", filler))
+	return border.Render("─") + " " + title + " " + border.Render(strings.Repeat("─", filler))
 }
 
 func padWidth(s string, width int) string {
@@ -221,6 +234,7 @@ func renderHelp(width, height int, pages bool, extra map[string][]string) string
 		{"/", "filter"},
 		{"r", "refresh pane"},
 		{"R", "refresh page"},
+		{"[ / ]", "previous / next tab"},
 		{"h/l ←/→", "previous / next pane"},
 		{"ctrl+h / ctrl+l", "previous / next pane"},
 		{"ctrl+j / ctrl+k", "focus pane below / above"},

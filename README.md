@@ -221,6 +221,24 @@ Stacked panes split the column evenly. Set `fit = true` on a recipe whose
 output is short, and its pane takes only the lines it needs, leaving the rest
 to the other panes in the stack.
 
+To show several panes in one slot, give a section `tabs` instead. Each
+tab is a normal section with its own recipe:
+
+```toml
+sections = [[
+  { tabs = [
+    { title = "Files", command = "git status --short" },
+    { title = "Worktrees", recipe = "sesh-worktrees" },
+    { title = "Submodules", command = "git submodule status" },
+  ] },
+]]
+```
+
+The border lists every tab (`2 Files - Worktrees - Submodules`) and
+highlights the one showing. `[` / `]` switch to the previous / next tab of
+the focused pane. A tab's command runs the first time the tab is shown. Tabs
+can sit inside a `stack`, but can't contain a stack or more tabs.
+
 ## Keybindings
 
 | Key                                   | Action                                |
@@ -234,6 +252,7 @@ to the other panes in the stack.
 | `/`                                   | filter the table (`esc` clears)       |
 | `r`                                   | reload the pane                       |
 | `R`                                   | reload every pane on the page         |
+| `[` / `]`                             | previous / next tab in the pane       |
 | click                                 | focus pane and select row             |
 | `?`                                   | help, including the pane's `keys`     |
 | `q` / `esc`                           | quit                                  |

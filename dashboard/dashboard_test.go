@@ -581,3 +581,57 @@ func TestShiftRReloadsEachFeedOnPageOnce(t *testing.T) {
 		t.Errorf("want 2 reloads, got %#v", batch)
 	}
 }
+
+func TestTabsSwitchWithBrackets(t *testing.T) {
+	later := filepath.Join(t.TempDir(), "later")
+	cfg, err := LoadConfig(writeConfig(t, `
+[[page]]
+sections = [[
+  { title = "Side", command = "echo side" },
+  { tabs = [{ title = "Files", command = "echo files" }, { title = "Worktrees", command = "touch `+later+`; echo trees" }, { title = "Submodules", command = "echo subs" }] },
+]]
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m, err := New(cfg)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m = drain(m, m.Init())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 80, Height: 10})
+	m = next.(Model)
+	if !strings.Contains(ansi.Strip(m.viewPage()), "┌─ 2 Files - Worktrees - Submodules ─") {
+		t.Errorf("tab titles not in border:\n%s", ansi.Strip(m.viewPage()))
+	}
+	if _, err := os.Stat(later); err == nil {
+		t.Error("hidden tab loaded before it was shown")
+	}
+
+	press := func(k string) {
+		next, cmd := m.Update(key(k))
+		m = drain(next.(Model), cmd)
+	}
+	press("]")
+	if m.focused().Title() != "Side" {
+		t.Error("] on a pane without tabs should do nothing")
+	}
+	press("2")
+	for _, step := range []struct{ key, want string }{{"]", "Worktrees"}, {"]", "Submodules"}, {"]", "Files"}, {"[", "Submodules"}, {"[", "Worktrees"}} {
+		press(step.key)
+		if got := m.focused().Title(); got != step.want {
+			t.Fatalf("%s: focused %q, want %q", step.key, got, step.want)
+		}
+	}
+	if _, err := os.Stat(later); err != nil {
+		t.Error("tab didn't load when shown")
+	}
+	if !strings.Contains(m.viewPage(), "trees") {
+		t.Error("active tab's output not shown")
+	}
+
+	cfg.Pages[0].Sections[0][1].Tabs[0].Tabs = []SectionConfig{{}}
+	if _, err := New(cfg); err == nil {
+		t.Error("nested tabs should error")
+	}
+}

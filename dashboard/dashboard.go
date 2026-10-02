@@ -77,13 +77,36 @@ func (c Config) column(sc SectionConfig, fs feeds) (column, error) {
 		if len(member.Stack) > 0 {
 			return nil, fmt.Errorf("section %q: a stack can't contain another stack", member.Title)
 		}
-		r, err := c.resolve(member)
+		sec, err := c.section(member, fs)
 		if err != nil {
 			return nil, err
 		}
-		col = append(col, newSection(member.Title, r, fs))
+		col = append(col, sec)
 	}
 	return col, nil
+}
+
+func (c Config) section(sc SectionConfig, fs feeds) (Section, error) {
+	if len(sc.Tabs) == 0 {
+		r, err := c.resolve(sc)
+		if err != nil {
+			return nil, err
+		}
+		return newSection(sc.Title, r, fs), nil
+	}
+	t := &tabbed{}
+	for _, tab := range sc.Tabs {
+		if len(tab.Stack) > 0 || len(tab.Tabs) > 0 {
+			return nil, fmt.Errorf("tab %q can't contain a stack or more tabs", tab.Title)
+		}
+		r, err := c.resolve(tab)
+		if err != nil {
+			return nil, err
+		}
+		t.tabs = append(t.tabs, newSection(tab.Title, r, fs))
+	}
+	t.Section = t.tabs[0]
+	return t, nil
 }
 
 func (m Model) Action() []string { return m.action }
@@ -189,6 +212,14 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 	case "R", "shift+r":
 		return m, m.reloadPage()
+	case "[":
+		if t, ok := m.slot().(*tabbed); ok {
+			return m, t.cycle(-1)
+		}
+	case "]":
+		if t, ok := m.slot().(*tabbed); ok {
+			return m, t.cycle(1)
+		}
 	case "tab":
 		if m.hidePages {
 			return m, nil
@@ -256,7 +287,7 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
 			for s, h := range stackHeights(m.rowHeights[r], cols[c]) {
 				if line < start+h+2 || s == len(cols[c])-1 {
 					m.focus = base + s
-					if l, ok := cols[c][s].(*listPane); ok {
+					if l, ok := current(cols[c][s]).(*listPane); ok {
 						l.ClickAt(line - start - 1)
 					}
 					return m
@@ -354,12 +385,19 @@ func (m Model) indexOf(row, col, stack int) int {
 	return idx
 }
 
-func (m Model) focused() Section {
+func (m Model) slot() Section {
 	r, c, s, ok := m.paneAt(m.focus)
 	if !ok {
 		return nil
 	}
 	return m.rows()[r][c][s]
+}
+
+func (m Model) focused() Section {
+	if s := m.slot(); s != nil {
+		return current(s)
+	}
+	return nil
 }
 
 func (m Model) allSections() []Section {
@@ -476,8 +514,14 @@ func (m Model) viewPage() string {
 			fc[i] = frameColumn{width: w, panes: make([]framePane, len(panes))}
 			for s, sec := range panes {
 				focused := m.focus == base
+				tabs, active := []string{sec.Title()}, 0
+				if t, ok := sec.(*tabbed); ok {
+					tabs, active = t.titles(), t.active
+				}
 				fc[i].panes[s] = framePane{
-					title:   fmt.Sprintf("%d %s", base+1, sec.Title()),
+					number:  base + 1,
+					tabs:    tabs,
+					active:  active,
 					content: sec.View(w, heights[s], focused),
 					height:  heights[s],
 					focused: focused,
