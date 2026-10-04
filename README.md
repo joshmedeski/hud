@@ -9,17 +9,18 @@ This is [`hud.example.toml`](hud.example.toml):
 
 ```
 Dashboard │ Life
-─────────────────────────────────────────────────────────────────
-┌─ 1 Sessions ───────────────────┐┌─ 2 Weather ─────────────────┐
-│ Attached  Name                 ││Weather report: Houston, TX  │
-│ 1         hud                  ││                Cloudy       │
-│ 0         sesh                 ││       .--.     +91(96) °F   │
-└────────────────────────────────┘└─────────────────────────────┘
-┌─ 3 Config + Zoxide ────────────┐┌─ 4 joshmedeski/sesh ────────┐
-│ Name                           ││ Title                 State │
-│ second brain                   ││ Tmuxifier Support     OPEN  │
-└────────────────────────────────┘└─────────────────────────────┘
-tab page │ j/k move │ h/l pane │ enter open │ / filter │ q quit  ? help
+────────────────────────────────────────────────────────────────────────────────────────────
+┌─ 1 Sessions ───────────────────────────────┐┌─ 2 Weather ────────────────────────────────┐
+│ Attached  Name  Alerts                     ││Weather report: Houston, TX                 │
+│ 1         hud                              ││                                            │
+│ 0         sesh                             ││     \  /       Partly cloudy               │
+└────────────────────────────────────────────┘└────────────────────────────────────────────┘
+┌─ 3 Config + Zoxide ─────────┐┌─ 4 Nutiliti/nutiliti ───────┐┌─ 5 joshmedeski/sesh ───────┐
+│ Name                        ││ Number  State  Title        ││ Title              State   │
+│ second brain                ││ 412     OPEN   Dark mode    ││ Tmuxifier Support  OPEN    │
+│ ~/c/hud                     ││                             ││                            │
+└─────────────────────────────┘└─────────────────────────────┘└────────────────────────────┘
+tab │ j/k │ h/l │ enter │ / │ r/R │ 1-9 │ q                                                ?
 ```
 
 ## Install
@@ -151,6 +152,7 @@ overrides a field:
 - `command`, `columns`, `colors`, `labels`, `headers`, `where`, `enter` and
   `refresh` replace the recipe's value.
 - `keys` are merged with the recipe's keys.
+- `fit` is on if either the recipe or the section sets it.
 
 ```toml
 [recipe.sesh]
@@ -255,4 +257,4 @@ can sit inside a `stack`, but can't contain a stack or more tabs.
 | `[` / `]`                             | previous / next tab in the pane       |
 | click                                 | focus pane and select row             |
 | `?`                                   | help, including the pane's `keys`     |
-| `q` / `esc`                           | quit                                  |
+| `q` / `esc` / `ctrl+c`                | quit                                  |
