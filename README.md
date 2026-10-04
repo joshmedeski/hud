@@ -61,7 +61,7 @@ A recipe is a `[recipe.<name>]` table:
 | `colors`  | Map of column → color, or column → table of value → color. See [Colors](#colors).         |
 | `labels`  | Map of column → header text, replacing the generated title.                               |
 | `headers` | Set to `false` to hide the header row.                                                    |
-| `fit`     | In a `stack`, shrink the pane to its content and give the rest to the other panes.         |
+| `fit`     | In a `stack`, shrink the pane to its content and give the rest to the other panes.        |
 | `where`   | Map of JSON key → value (or list of values). Only rows that match every key are shown.    |
 
 `enter` and `keys` commands are lists of arguments, not shell strings. Each
@@ -88,7 +88,14 @@ keys = { "o" = ["gh", "browse", "{{.Number}}", "-R", "joshmedeski/sesh"] }
 The command prints one object per worktree:
 
 ```json
-[{ "Number": 89, "Path": "~/c/sesh/w/89", "Title": "Tmuxifier Support", "State": "OPEN" }]
+[
+  {
+    "Number": 89,
+    "Path": "~/c/sesh/w/89",
+    "Title": "Tmuxifier Support",
+    "State": "OPEN"
+  }
+]
 ```
 
 The pane shows each object as a row with its `Title` and `State`. Every other
@@ -243,18 +250,40 @@ can sit inside a `stack`, but can't contain a stack or more tabs.
 
 ## Keybindings
 
-| Key                                   | Action                                |
-| ------------------------------------- | ------------------------------------- |
-| `tab` / `shift+tab`                   | next / previous page                  |
-| `j` `k` / `↑` `↓`                     | move within a table                   |
-| `h` `l` / `←` `→` / `ctrl+h` `ctrl+l` | previous / next pane                  |
-| `ctrl+j` / `ctrl+k`                   | pane below / above                    |
-| `1`–`9`                               | jump to pane                          |
-| `enter`                               | run the recipe's `enter` command      |
-| `/`                                   | filter the table (`esc` clears)       |
-| `r`                                   | reload the pane                       |
-| `R`                                   | reload every pane on the page         |
-| `[` / `]`                             | previous / next tab in the pane       |
-| click                                 | focus pane and select row             |
-| `?`                                   | help, including the pane's `keys`     |
-| `q` / `esc` / `ctrl+c`                | quit                                  |
+| Key                                   | Action                            |
+| ------------------------------------- | --------------------------------- |
+| `tab` / `shift+tab`                   | next / previous page              |
+| `j` `k` / `↑` `↓`                     | move within a table               |
+| `h` `l` / `←` `→` / `ctrl+h` `ctrl+l` | previous / next pane              |
+| `ctrl+j` / `ctrl+k`                   | pane below / above                |
+| `1`–`9`                               | jump to pane                      |
+| `enter`                               | run the recipe's `enter` command  |
+| `/`                                   | filter the table (`esc` clears)   |
+| `r`                                   | reload the pane                   |
+| `R`                                   | reload every pane on the page     |
+| `[` / `]`                             | previous / next tab in the pane   |
+| click                                 | focus pane and select row         |
+| `?`                                   | help, including the pane's `keys` |
+| `q` / `esc` / `ctrl+c`                | quit                              |
+
+## Contributors
+
+<a href="https://github.com/joshmedeski/hud/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=joshmedeski/hud" />
+</a>
+
+## StarMapper
+
+<a href="https://starmapper.bruniaux.com/joshmedeski/hud?utm_source=map-embed&utm_medium=readme&utm_campaign=stargazer-map">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud?theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud?theme=light" />
+    <img alt="StarMapper" src="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud" />
+  </picture>
+</a>
+
+Made with [contrib.rocks](https://contrib.rocks).
+
+## Star History
+
+[![Star History Chart](https://star-history.dera.page/svg?repos=joshmedeski/hud&type=Date)](https://star-history.dera.page/#joshmedeski/hud&Date)
