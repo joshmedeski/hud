@@ -287,3 +287,19 @@ Made with [contrib.rocks](https://contrib.rocks).
 ## Star History
 
 [![Star History Chart](https://star-history.dera.page/svg?repos=joshmedeski/hud&type=Date)](https://star-history.dera.page/#joshmedeski/hud&Date)
+
+## StarMapper
+
+<a href="https://starmapper.bruniaux.com/joshmedeski/hud?utm_source=map-embed&utm_medium=readme&utm_campaign=stargazer-map">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud?theme=dark" />
+    <source media="(prefers-color-scheme: light)" srcset="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud?theme=light" />
+    <img alt="StarMapper" src="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud" />
+  </picture>
+</a>
+
+Made with [contrib.rocks](https://contrib.rocks).
+
+## Star History
+
+[![Star History Chart](https://star-history.dera.page/svg?repos=joshmedeski/hud&type=Date)](https://star-history.dera.page/#joshmedeski/hud&Date)
