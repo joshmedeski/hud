@@ -74,6 +74,9 @@ keys.enter = { run = ["sesh", "connect", "{{.Name}}"], quit = true }
 keys."ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"]
 ```
 
+To bind several keys to one command, separate them with spaces:
+`keys."enter o" = [...]`.
+
 Commands are lists of arguments, not shell strings. Each argument is a Go
 template that gets the selected row, so `{{.Name}}` becomes that row's `Name`
 value. A value with spaces stays a single argument, so no quoting is needed.

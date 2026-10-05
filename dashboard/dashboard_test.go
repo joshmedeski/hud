@@ -26,7 +26,7 @@ func TestLoadConfigResolvesRecipeOverrides(t *testing.T) {
 [recipe.items]
 command = "list-items"
 columns = ["Name"]
-keys.enter = { run = ["open-item", "{{.Name}}"], quit = true }
+keys."enter o" = { run = ["open-item", "{{.Name}}"], quit = true }
 keys."ctrl+d" = ["remove-item", "{{.Name}}"]
 
 [recipe.split.keys.o]
@@ -36,7 +36,7 @@ quit = true
 [[page]]
 title = "Main"
 sections = [[
-  { title = "Mine", recipe = "items", command = "list-items --mine", keys = { "x" = ["echo", "{{.Name}}"] } },
+  { title = "Mine", recipe = "items", command = "list-items --mine", keys = { "x" = ["echo", "{{.Name}}"], "o" = ["gh", "browse"] } },
   { title = "Weather", command = "curl wttr.in", refresh = 300 },
 ]]
 `))
@@ -54,6 +54,9 @@ sections = [[
 	}
 	if enter := mine.Keys["enter"]; !enter.Quit || !slices.Equal(enter.Run, []string{"open-item", "{{.Name}}"}) {
 		t.Errorf("enter not inherited from recipe: %+v", enter)
+	}
+	if o := mine.Keys["o"]; o.Quit || o.Run[0] != "gh" {
+		t.Errorf("section key should replace one key of a shared binding: %+v", o)
 	}
 	if del := mine.Keys["ctrl+d"]; del.Quit || len(del.Run) != 2 {
 		t.Errorf("recipe keys dropped when section adds its own: %+v", del)

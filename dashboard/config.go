@@ -126,6 +126,7 @@ func checkColorRule(rule any) error {
 }
 
 func (c Config) merge(sc SectionConfig) (Recipe, error) {
+	sc.Keys = splitKeys(sc.Keys)
 	if sc.Use == "" {
 		return sc.Recipe, nil
 	}
@@ -151,12 +152,17 @@ func (c Config) merge(sc SectionConfig) (Recipe, error) {
 	if sc.Where != nil {
 		base.Where = sc.Where
 	}
-	if sc.Keys != nil {
-		base.Keys = maps.Clone(base.Keys)
-		if base.Keys == nil {
-			base.Keys = map[string]Action{}
-		}
-		maps.Copy(base.Keys, sc.Keys)
-	}
+	base.Keys = splitKeys(base.Keys)
+	maps.Copy(base.Keys, sc.Keys)
 	return base, nil
+}
+
+func splitKeys(keys map[string]Action) map[string]Action {
+	out := make(map[string]Action, len(keys))
+	for names, action := range keys {
+		for _, name := range strings.Fields(names) {
+			out[name] = action
+		}
+	}
+	return out
 }
