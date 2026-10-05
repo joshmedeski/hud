@@ -223,14 +223,13 @@ func renderFooter(width int, pages, filtering bool, query string) string {
 	return padWidth(line(false), width)
 }
 
-func renderHelp(width, height int, pages bool, extra map[string][]string) string {
+func renderHelp(width, height int, pages bool, extra map[string]Action) string {
 	var binds []keybind
 	if pages {
 		binds = append(binds, keybind{"tab / shift+tab", "next / previous page"})
 	}
 	binds = append(binds, []keybind{
 		{"j/k ↑/↓", "move"},
-		{"enter", "open"},
 		{"/", "filter"},
 		{"r", "refresh pane"},
 		{"R", "refresh page"},
@@ -244,7 +243,11 @@ func renderHelp(width, height int, pages bool, extra map[string][]string) string
 		{"q / esc", "quit"},
 	}...)
 	for _, key := range slices.Sorted(maps.Keys(extra)) {
-		binds = append(binds, keybind{key, strings.Join(extra[key], " ")})
+		label := strings.Join(extra[key].Run, " ")
+		if extra[key].Quit {
+			label += " (quits hud)"
+		}
+		binds = append(binds, keybind{key, label})
 	}
 
 	keyWidth := 0

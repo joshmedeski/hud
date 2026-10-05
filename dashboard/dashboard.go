@@ -488,7 +488,7 @@ func (m Model) View() tea.View {
 
 	var content string
 	if m.showHelp {
-		var keys map[string][]string
+		var keys map[string]Action
 		if l, ok := m.focused().(*listPane); ok {
 			keys = l.recipe.Keys
 		}

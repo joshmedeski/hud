@@ -1,7 +1,9 @@
 package dashboard
 
 import (
+	"bytes"
 	"cmp"
+	"errors"
 	"fmt"
 	"maps"
 	"os"
@@ -12,16 +14,38 @@ import (
 )
 
 type Recipe struct {
-	Command string              `toml:"command"`
-	Columns []string            `toml:"columns"`
-	Enter   []string            `toml:"enter"`
-	Keys    map[string][]string `toml:"keys"`
-	Refresh int                 `toml:"refresh"`
-	Colors  map[string]any      `toml:"colors"`
-	Headers *bool               `toml:"headers"`
-	Labels  map[string]string   `toml:"labels"`
-	Fit     bool                `toml:"fit"`
-	Where   map[string]any      `toml:"where"`
+	Command string            `toml:"command"`
+	Columns []string          `toml:"columns"`
+	Keys    map[string]Action `toml:"keys"`
+	Refresh int               `toml:"refresh"`
+	Colors  map[string]any    `toml:"colors"`
+	Headers *bool             `toml:"headers"`
+	Labels  map[string]string `toml:"labels"`
+	Fit     bool              `toml:"fit"`
+	Where   map[string]any    `toml:"where"`
+}
+
+type Action struct {
+	Run  []string `toml:"run"`
+	Quit bool     `toml:"quit"`
+}
+
+func (a *Action) UnmarshalTOML(data []byte) error {
+	value := append([]byte("v = "), data...)
+	var list struct{ V []string }
+	if toml.Unmarshal(value, &list) == nil {
+		*a = Action{Run: list.V}
+		return nil
+	}
+	var inline struct{ V Action }
+	if toml.Unmarshal(value, &inline) == nil {
+		*a = inline.V
+		return nil
+	}
+	if toml.Unmarshal(data, a) == nil {
+		return nil
+	}
+	return fmt.Errorf("want a list of arguments or { run = [...], quit = true }, got %s", bytes.TrimSpace(data))
 }
 
 type SectionConfig struct {
@@ -60,7 +84,11 @@ func LoadConfig(path string) (Config, error) {
 	if err != nil {
 		return cfg, err
 	}
-	if err := toml.Unmarshal(b, &cfg); err != nil {
+	err = toml.NewDecoder(bytes.NewReader(b)).EnableUnmarshalerInterface().DisallowUnknownFields().Decode(&cfg)
+	if strict, ok := errors.AsType[*toml.StrictMissingError](err); ok {
+		return cfg, fmt.Errorf("%s: unknown fields:\n%s", path, strict.String())
+	}
+	if err != nil {
 		return cfg, fmt.Errorf("%s: %w", path, err)
 	}
 	return cfg, nil
@@ -123,13 +151,10 @@ func (c Config) merge(sc SectionConfig) (Recipe, error) {
 	if sc.Where != nil {
 		base.Where = sc.Where
 	}
-	if sc.Enter != nil {
-		base.Enter = sc.Enter
-	}
 	if sc.Keys != nil {
 		base.Keys = maps.Clone(base.Keys)
 		if base.Keys == nil {
-			base.Keys = map[string][]string{}
+			base.Keys = map[string]Action{}
 		}
 		maps.Copy(base.Keys, sc.Keys)
 	}

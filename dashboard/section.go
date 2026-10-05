@@ -364,45 +364,46 @@ func cellStyle(rule any, cell string, item map[string]any) string {
 
 func (p *listPane) handleKey(msg tea.KeyPressMsg) tea.Cmd {
 	if p.filtering {
-		p.handleFilterKey(msg)
-		return nil
+		return p.handleFilterKey(msg)
 	}
 	switch msg.String() {
 	case "j", "down":
 		p.cursorDown()
 	case "k", "up":
 		p.cursorUp()
-	case "enter":
-		p.selectItem()
 	case "/":
 		p.filtering, p.query = true, ""
 		p.applyFilter()
 	case "r":
 		return p.fetch(nil)
 	default:
-		if argv, ok := p.recipe.Keys[msg.String()]; ok {
-			return p.runKey(argv)
+		if action, ok := p.recipe.Keys[msg.String()]; ok {
+			return p.runKey(action)
 		}
 	}
 	return nil
 }
 
-func (p *listPane) handleFilterKey(msg tea.KeyPressMsg) {
+func (p *listPane) handleFilterKey(msg tea.KeyPressMsg) tea.Cmd {
 	if isBackspaceKey(msg) {
 		if r := []rune(p.query); len(r) > 0 {
 			p.query = string(r[:len(r)-1])
 		}
 		p.applyFilter()
-		return
+		return nil
 	}
 	switch msg.String() {
 	case "esc":
 		p.filtering, p.query = false, ""
 		p.applyFilter()
 	case "enter":
-		p.selectItem()
+		var cmd tea.Cmd
+		if action, ok := p.recipe.Keys["enter"]; ok {
+			cmd = p.runKey(action)
+		}
 		p.filtering, p.query = false, ""
 		p.applyFilter()
+		return cmd
 	case "down":
 		p.cursorDown()
 	case "up":
@@ -413,6 +414,7 @@ func (p *listPane) handleFilterKey(msg tea.KeyPressMsg) {
 			p.applyFilter()
 		}
 	}
+	return nil
 }
 
 func (p *listPane) Filtering() bool     { return p.filtering }
@@ -426,30 +428,21 @@ func (p *listPane) hovered() (map[string]any, bool) {
 	return p.items[p.visible[p.cursor]], true
 }
 
-func (p *listPane) selectItem() {
+func (p *listPane) runKey(action Action) tea.Cmd {
 	item, ok := p.hovered()
-	if !ok || len(p.recipe.Enter) == 0 {
-		return
-	}
-	argv, err := expand(p.recipe.Enter, item)
-	if err != nil {
-		p.err = err
-		return
-	}
-	p.chosen = argv
-}
-
-func (p *listPane) runKey(argv []string) tea.Cmd {
-	item, ok := p.hovered()
-	if !ok {
+	if !ok || len(action.Run) == 0 {
 		return nil
 	}
-	expanded, err := expand(argv, item)
+	argv, err := expand(action.Run, item)
 	if err != nil {
 		p.err = err
 		return nil
 	}
-	return p.fetch(expanded)
+	if action.Quit {
+		p.chosen = argv
+		return nil
+	}
+	return p.fetch(argv)
 }
 
 func (p *listPane) applyFilter() {

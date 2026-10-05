@@ -1,21 +1,21 @@
 [recipe.sesh]
 command = "sesh list --json"
 columns = ["Icon", "Name", "Path"]
-enter = ["sesh", "connect", "{{.Name}}"]
-keys = { "ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"] }
+keys.enter = { run = ["sesh", "connect", "{{.Name}}"], quit = true }
+keys."ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"]
 
 [recipe.nutiliti-worktrees]
 command = "sesh worktree list -r Nutiliti/nutiliti --json"
 columns = ["Number", "State", "Title"]
-enter = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "Nutiliti/nutiliti"]
-keys = { "o" = ["gh", "browse", "{{.Number}}", "-R", "Nutiliti/nutiliti"] }
+keys.enter = { run = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "Nutiliti/nutiliti"], quit = true }
+keys.o = ["gh", "browse", "{{.Number}}", "-R", "Nutiliti/nutiliti"]
 colors = { State = { OPEN = "green", CLOSED = "red", MERGED = "magenta" } }
 
 [recipe.sesh-worktrees]
 command = "sesh worktree list -r joshmedeski/sesh --json"
 columns = ["Title", "State"]
-enter = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "joshmedeski/sesh"]
-keys = { "o" = ["gh", "browse", "{{.Number}}", "-R", "joshmedeski/sesh"] }
+keys.enter = { run = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "joshmedeski/sesh"], quit = true }
+keys.o = ["gh", "browse", "{{.Number}}", "-R", "joshmedeski/sesh"]
 colors = { State = { OPEN = "green", CLOSED = "red", MERGED = "magenta" } }
 
 [recipe.calendar]

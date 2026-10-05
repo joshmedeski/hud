@@ -26,8 +26,12 @@ func TestLoadConfigResolvesRecipeOverrides(t *testing.T) {
 [recipe.items]
 command = "list-items"
 columns = ["Name"]
-enter = ["open-item", "{{.Name}}"]
-keys = { "ctrl+d" = ["remove-item", "{{.Name}}"] }
+keys.enter = { run = ["open-item", "{{.Name}}"], quit = true }
+keys."ctrl+d" = ["remove-item", "{{.Name}}"]
+
+[recipe.split.keys.o]
+run = ["open", "{{.Name}}"]
+quit = true
 
 [[page]]
 title = "Main"
@@ -48,11 +52,14 @@ sections = [[
 	if mine.Command != "list-items --mine" {
 		t.Errorf("command override lost: %q", mine.Command)
 	}
-	if !slices.Equal(mine.Enter, []string{"open-item", "{{.Name}}"}) {
-		t.Errorf("enter not inherited from recipe: %v", mine.Enter)
+	if enter := mine.Keys["enter"]; !enter.Quit || !slices.Equal(enter.Run, []string{"open-item", "{{.Name}}"}) {
+		t.Errorf("enter not inherited from recipe: %+v", enter)
 	}
-	if _, ok := mine.Keys["ctrl+d"]; !ok {
-		t.Error("recipe keys dropped when section adds its own")
+	if del := mine.Keys["ctrl+d"]; del.Quit || len(del.Run) != 2 {
+		t.Errorf("recipe keys dropped when section adds its own: %+v", del)
+	}
+	if o := cfg.Recipes["split"].Keys["o"]; !o.Quit || len(o.Run) != 2 {
+		t.Errorf("key defined as a table not parsed: %+v", o)
 	}
 	if _, ok := cfg.Recipes["items"].Keys["x"]; ok {
 		t.Error("section keys leaked into the shared recipe")
@@ -80,6 +87,14 @@ sections = [[{ recipe = "nope" }]]`))
 	if _, err := New(cfg); err == nil {
 		t.Error("unknown recipe should error")
 	}
+	if _, err := LoadConfig(writeConfig(t, `[recipe.x]
+keys = { "o" = "gh browse" }`)); err == nil {
+		t.Error("a key bound to a plain string should error")
+	}
+	if _, err := LoadConfig(writeConfig(t, `[recipe.x]
+enter = ["open", "{{.Name}}"]`)); err == nil || !strings.Contains(err.Error(), "enter") {
+		t.Errorf("the removed enter field should be reported, got %v", err)
+	}
 }
 
 func loadedList(t *testing.T, r Recipe) *listPane {
@@ -103,7 +118,7 @@ func TestListPaneParsesFiltersAndChooses(t *testing.T) {
 	p := loadedList(t, Recipe{
 		Command: `echo '[{"Name":"my custom binaries","Attached":1},{"Name":"notes","Attached":0},{"Name":"hud"}]'`,
 		Columns: []string{"Name", "Attached"},
-		Enter:   []string{"open", "{{.Name}}"},
+		Keys:    map[string]Action{"enter": {Run: []string{"open", "{{.Name}}"}, Quit: true}},
 	})
 	if got := p.cells[0]; !slices.Equal(got, []string{"my custom binaries", "1"}) {
 		t.Errorf("cells = %q", got)
@@ -143,9 +158,9 @@ func TestListPaneReportsBadJSON(t *testing.T) {
 	}
 }
 
-func TestEnterQuitsWithAction(t *testing.T) {
+func TestQuitKeyQuitsWithAction(t *testing.T) {
 	m, err := New(Config{Pages: []PageConfig{{Sections: [][]SectionConfig{{{
-		Recipe: Recipe{Command: `echo '[{"Name":"a"}]'`, Columns: []string{"Name"}, Enter: []string{"echo", "{{.Name}}"}},
+		Recipe: Recipe{Command: `echo '[{"Name":"a"}]'`, Columns: []string{"Name"}, Keys: map[string]Action{"o": {Run: []string{"echo", "{{.Name}}"}, Quit: true}}},
 	}}}}}})
 	if err != nil {
 		t.Fatal(err)
@@ -153,9 +168,28 @@ func TestEnterQuitsWithAction(t *testing.T) {
 	p := m.focused().(*listPane)
 	p.Update(p.fetch(nil)())
 
-	next, cmd := m.Update(key("enter"))
+	next, cmd := m.Update(key("o"))
 	if !slices.Equal(next.(Model).Action(), []string{"echo", "a"}) || cmd == nil {
 		t.Errorf("action = %q", next.(Model).Action())
+	}
+}
+
+func TestEnterKeyRunsInBackground(t *testing.T) {
+	p := loadedList(t, Recipe{
+		Command: `echo '[{"Name":"a"}]'`,
+		Columns: []string{"Name"},
+		Keys:    map[string]Action{"enter": {Run: []string{"true"}}},
+	})
+	if cmd := p.Update(key("enter")); cmd == nil {
+		t.Error("keys.enter should run as a background action")
+	}
+	if p.Chosen() != nil {
+		t.Errorf("keys.enter should not quit, chosen = %q", p.Chosen())
+	}
+
+	p.Update(key("/"))
+	if cmd := p.Update(key("enter")); cmd == nil || p.Filtering() {
+		t.Error("enter while filtering should run keys.enter and leave filter mode")
 	}
 }
 
@@ -226,7 +260,7 @@ func TestWorktreeRowRendersIntegersAndLists(t *testing.T) {
 	p := loadedList(t, Recipe{
 		Command: `printf '%s' '[{"Number":7235,"Alerts":["bell","activity"],"location":"Cafe\n626 E Ninth St"}]'`,
 		Columns: []string{"Number", "Alerts", "location"},
-		Enter:   []string{"gh", "browse", "{{.Number}}"},
+		Keys:    map[string]Action{"enter": {Run: []string{"gh", "browse", "{{.Number}}"}, Quit: true}},
 	})
 	if got := p.cells[0]; !slices.Equal(got, []string{"7235", "bell activity", "Cafe 626 E Ninth St"}) {
 		t.Errorf("cells = %q", got)

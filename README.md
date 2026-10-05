@@ -55,8 +55,7 @@ A recipe is a `[recipe.<name>]` table:
 | --------- | ----------------------------------------------------------------------------------------- |
 | `command` | Shell command to run.                                                                     |
 | `columns` | JSON keys to show as table columns. Leave it out and the output is shown as plain text.   |
-| `enter`   | Command to run on `enter`. hud quits first, then runs it in your terminal.                |
-| `keys`    | Map of key → command. Runs in the background while hud stays open, then the pane reloads. |
+| `keys`    | Map of key → command to run on the selected row. See [Keys](#keys).                       |
 | `refresh` | Reload every N seconds.                                                                   |
 | `colors`  | Map of column → color, or column → table of value → color. See [Colors](#colors).         |
 | `labels`  | Map of column → header text, replacing the generated title.                               |
@@ -64,10 +63,21 @@ A recipe is a `[recipe.<name>]` table:
 | `fit`     | In a `stack`, shrink the pane to its content and give the rest to the other panes.        |
 | `where`   | Map of JSON key → value (or list of values). Only rows that match every key are shown.    |
 
-`enter` and `keys` commands are lists of arguments, not shell strings. Each
-argument is a Go template that gets the selected row, so `{{.Name}}` becomes
-that row's `Name` value. A value with spaces stays a single argument, so no
-quoting is needed.
+### Keys
+
+Each entry in `keys` binds a key, `enter` included, to a command. A plain
+list runs in the background while hud stays open, then the pane reloads.
+Add `quit = true` to quit hud first and run the command in your terminal:
+
+```toml
+keys.enter = { run = ["sesh", "connect", "{{.Name}}"], quit = true }
+keys."ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"]
+```
+
+Commands are lists of arguments, not shell strings. Each argument is a Go
+template that gets the selected row, so `{{.Name}}` becomes that row's `Name`
+value. A value with spaces stays a single argument, so no quoting is needed.
+Built-in keys like `j`, `k`, `/` and `r` can't be rebound.
 
 With `columns` set, the command must print a JSON array of objects. Column
 titles are made readable from the keys (`listName` → "List Name",
@@ -81,8 +91,8 @@ breaks are collapsed so each row stays on one line.
 [recipe.sesh-worktrees]
 command = "sesh worktree list -r joshmedeski/sesh --json"
 columns = ["Title", "State"]
-enter = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "joshmedeski/sesh"]
-keys = { "o" = ["gh", "browse", "{{.Number}}", "-R", "joshmedeski/sesh"] }
+keys.enter = { run = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "joshmedeski/sesh"], quit = true }
+keys.o = ["gh", "browse", "{{.Number}}", "-R", "joshmedeski/sesh"]
 ```
 
 The command prints one object per worktree:
@@ -102,7 +112,7 @@ The pane shows each object as a row with its `Title` and `State`. Every other
 field, such as `Number` and `Path`, is still there for templates. With
 "Tmuxifier Support" selected:
 
-- `enter` closes hud and runs `sesh worktree connect 89 -r joshmedeski/sesh`
+- `enter` quits hud and runs `sesh worktree connect 89 -r joshmedeski/sesh`
   in your terminal, which switches you to that worktree's session.
 - `o` runs `gh browse 89 -R joshmedeski/sesh` in the background to open
   issue #89 in your browser. hud stays open and reloads the pane.
@@ -146,7 +156,8 @@ refresh = 300
 [recipe.reminders]
 command = "remindctl show --json | jq 'sort_by(.dueDate // \"~\")'"
 columns = ["title", "listName"]
-keys = { "c" = ["remindctl", "complete", "{{.id}}"], "o" = ["remindctl", "open", "{{.id}}"] }
+keys.c = ["remindctl", "complete", "{{.id}}"]
+keys.o = ["remindctl", "open", "{{.id}}"]
 refresh = 300
 ```
 
@@ -156,17 +167,18 @@ A section has a `title`, an optional `recipe` to start from, and any recipe
 field to override. This lets several panes share one recipe. When a section
 overrides a field:
 
-- `command`, `columns`, `colors`, `labels`, `headers`, `where`, `enter` and
-  `refresh` replace the recipe's value.
-- `keys` are merged with the recipe's keys.
+- `command`, `columns`, `colors`, `labels`, `headers`, `where` and `refresh`
+  replace the recipe's value.
+- `keys` are merged with the recipe's keys. A key set in both uses the
+  section's command.
 - `fit` is on if either the recipe or the section sets it.
 
 ```toml
 [recipe.sesh]
 command = "sesh list --json"
 columns = ["Icon", "Name", "Path"]
-enter = ["sesh", "connect", "{{.Name}}"]
-keys = { "ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"] }
+keys.enter = { run = ["sesh", "connect", "{{.Name}}"], quit = true }
+keys."ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"]
 
 [[page]]
 title = "Dashboard"
@@ -257,7 +269,7 @@ can sit inside a `stack`, but can't contain a stack or more tabs.
 | `h` `l` / `←` `→` / `ctrl+h` `ctrl+l` | previous / next pane              |
 | `ctrl+j` / `ctrl+k`                   | pane below / above                |
 | `1`–`9`                               | jump to pane                      |
-| `enter`                               | run the recipe's `enter` command  |
+| `enter`                               | run the pane's `enter` key        |
 | `/`                                   | filter the table (`esc` clears)   |
 | `r`                                   | reload the pane                   |
 | `R`                                   | reload every pane on the page     |
@@ -271,22 +283,6 @@ can sit inside a `stack`, but can't contain a stack or more tabs.
 <a href="https://github.com/joshmedeski/hud/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=joshmedeski/hud" />
 </a>
-
-## StarMapper
-
-<a href="https://starmapper.bruniaux.com/joshmedeski/hud?utm_source=map-embed&utm_medium=readme&utm_campaign=stargazer-map">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud?theme=dark" />
-    <source media="(prefers-color-scheme: light)" srcset="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud?theme=light" />
-    <img alt="StarMapper" src="https://starmapper.bruniaux.com/api/map-image/joshmedeski/hud" />
-  </picture>
-</a>
-
-Made with [contrib.rocks](https://contrib.rocks).
-
-## Star History
-
-[![Star History Chart](https://star-history.dera.page/svg?repos=joshmedeski/hud&type=Date)](https://star-history.dera.page/#joshmedeski/hud&Date)
 
 ## StarMapper
 
