@@ -516,7 +516,7 @@ func (p *listPane) View(width, height int, focused bool) string {
 	for i := p.offset; i < end; i++ {
 		line := joinCells(p.painted[p.visible[i]], widths)
 		if i == p.cursor {
-			line = cursorStyle(focused).Render(padWidth(line, width))
+			line = cursorStyle().Render(padWidth(line, width))
 		}
 		lines = append(lines, line)
 	}

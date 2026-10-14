@@ -13,12 +13,11 @@ import (
 )
 
 var (
-	colorAccent       = lipgloss.ANSIColor(4)
-	colorDimmed       = lipgloss.ANSIColor(8)
-	colorText         = lipgloss.ANSIColor(15)
-	colorWarning      = lipgloss.ANSIColor(11)
-	colorHighlight    = lipgloss.ANSIColor(0)
-	colorHighlightDim = lipgloss.ANSIColor(236)
+	colorAccent    = lipgloss.ANSIColor(4)
+	colorDimmed    = lipgloss.ANSIColor(8)
+	colorText      = lipgloss.ANSIColor(15)
+	colorWarning   = lipgloss.ANSIColor(11)
+	colorHighlight = lipgloss.Black
 )
 
 func accentStyle() lipgloss.Style  { return lipgloss.NewStyle().Foreground(colorAccent).Bold(true) }
@@ -26,12 +25,7 @@ func DimmedStyle() lipgloss.Style  { return lipgloss.NewStyle().Foreground(color
 func TextStyle() lipgloss.Style    { return lipgloss.NewStyle().Foreground(colorText) }
 func WarningStyle() lipgloss.Style { return lipgloss.NewStyle().Foreground(colorWarning) }
 
-func cursorStyle(focused bool) lipgloss.Style {
-	if focused {
-		return lipgloss.NewStyle().Background(colorHighlight)
-	}
-	return lipgloss.NewStyle().Background(colorHighlightDim)
-}
+func cursorStyle() lipgloss.Style { return lipgloss.NewStyle().Background(colorHighlight) }
 
 var colorNames = map[string]color.Color{
 	"black": lipgloss.Black, "red": lipgloss.Red, "green": lipgloss.Green, "yellow": lipgloss.Yellow,
