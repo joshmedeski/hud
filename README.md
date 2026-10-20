@@ -62,6 +62,9 @@ A recipe is a `[recipe.<name>]` table:
 | `headers` | Set to `false` to hide the header row.                                                    |
 | `fit`     | In a `stack`, shrink the pane to its content and give the rest to the other panes.        |
 | `where`   | Map of JSON key → value (or list of values). Only rows that match every key are shown.    |
+| `days`    | Show rows as a calendar of the next N days that have entries. See [Calendar](#calendar).  |
+| `date`    | JSON key holding each row's date, for `days`.                                             |
+| `end`     | JSON key holding each row's end date, for `days`.                                         |
 
 ### Keys
 
@@ -163,6 +166,35 @@ keys.c = ["remindctl", "complete", "{{.id}}"]
 keys.o = ["remindctl", "open", "{{.id}}"]
 refresh = 300
 ```
+
+### Calendar
+
+Set `days` and `date` to show rows side by side, one column per day:
+
+```toml
+[recipe.upcoming]
+command = "ical upcoming --exclude-calendar Birthdays -o json"
+days = 3
+date = "start_date"
+end = "end_date"
+columns = ["title"]
+```
+
+```
+Mon                        Tue                        Fri
+Event Title 7:30am         Event title 6pm            Austin trip
+Another event title 2pm                               Another event 7pm
+```
+
+Each entry shows its `columns` joined by spaces, followed by its start time.
+Days without entries are skipped, so `days = 3` shows the next three days that
+have something on them, starting today. Columns split the pane's width evenly
+and long entries are truncated. `date` accepts RFC 3339 (`2026-10-20T15:30:00Z`)
+or a plain date (`2026-10-20`); entries at midnight are treated as all-day and
+show no time.
+
+With `end` set, an event happening now is bold, and events that have ended are
+gray. Without it, events turn gray once they start.
 
 ## Pages and sections
 

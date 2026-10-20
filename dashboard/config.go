@@ -23,6 +23,9 @@ type Recipe struct {
 	Labels  map[string]string `toml:"labels"`
 	Fit     bool              `toml:"fit"`
 	Where   map[string]any    `toml:"where"`
+	Days    int               `toml:"days"`
+	Date    string            `toml:"date"`
+	End     string            `toml:"end"`
 }
 
 type Action struct {
@@ -99,6 +102,9 @@ func (c Config) resolve(sc SectionConfig) (Recipe, error) {
 	if err != nil {
 		return r, err
 	}
+	if r.Days > 0 && (r.Date == "" || len(r.Columns) == 0) {
+		return r, fmt.Errorf("section %q: days needs date and columns", sc.Title)
+	}
 	for col, rule := range r.Colors {
 		if err := checkColorRule(rule); err != nil {
 			return r, fmt.Errorf("section %q: colors.%s: %w", sc.Title, col, err)
@@ -136,6 +142,9 @@ func (c Config) merge(sc SectionConfig) (Recipe, error) {
 	}
 	base.Command = cmp.Or(sc.Command, base.Command)
 	base.Refresh = cmp.Or(sc.Refresh, base.Refresh)
+	base.Days = cmp.Or(sc.Days, base.Days)
+	base.Date = cmp.Or(sc.Date, base.Date)
+	base.End = cmp.Or(sc.End, base.End)
 	if sc.Columns != nil {
 		base.Columns = sc.Columns
 	}

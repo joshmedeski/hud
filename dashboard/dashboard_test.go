@@ -1,11 +1,13 @@
 package dashboard
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"testing"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -670,5 +672,68 @@ sections = [[
 	cfg.Pages[0].Sections[0][1].Tabs[0].Tabs = []SectionConfig{{}}
 	if _, err := New(cfg); err == nil {
 		t.Error("nested tabs should error")
+	}
+}
+
+func TestCalendarGroupsUpcomingDaysIntoColumns(t *testing.T) {
+	now := time.Date(2026, 10, 19, 9, 0, 0, 0, time.Local)
+	at := func(day, hour, minute int) string {
+		return time.Date(2026, 10, day, hour, minute, 0, 0, time.Local).Format(time.RFC3339)
+	}
+	out := fmt.Sprintf(`[
+		{"title":"Yesterday","start":%q},
+		{"title":"Another event title","start":%q},
+		{"title":"Event Title","start":%q},
+		{"title":"Event title","start":%q},
+		{"title":"Another event","start":%q},
+		{"title":"Holiday","start":%q},
+		{"title":"Too far","start":%q}
+	]`, at(18, 10, 0), at(19, 14, 0), at(19, 7, 30), at(20, 18, 0), at(23, 19, 0), at(23, 0, 0), at(24, 9, 0))
+	p := newSection("Calendar", Recipe{Command: "true", Columns: []string{"title"}, Date: "start", Days: 3}, nil).(*calendarPane)
+	p.loading, p.out = false, []byte(out)
+	p.parse(now)
+
+	lines := strings.Split(ansi.Strip(p.view(90, 10, now)), "\n")
+	want := []string{
+		" Mon                           Tue                           Fri",
+		" Event Title 7:30am            Event title 6pm               Holiday",
+		" Another event title 2pm                                     Another event 7pm",
+	}
+	for i, w := range want {
+		if strings.TrimRight(lines[i], " ") != w {
+			t.Errorf("line %d = %q, want %q", i, lines[i], w)
+		}
+	}
+	if len(lines) != len(want) {
+		t.Errorf("got %d lines, want %d", len(lines), len(want))
+	}
+	for _, line := range strings.Split(p.View(30, 10, false), "\n") {
+		if w := lipgloss.Width(line); w > 30 {
+			t.Errorf("line is %d wide, want <= 30: %q", w, line)
+		}
+	}
+}
+
+func TestCalendarBoldsCurrentAndDimsPastEvents(t *testing.T) {
+	now := time.Date(2026, 10, 19, 12, 0, 0, 0, time.Local)
+	at := func(hour int) string { return time.Date(2026, 10, 19, hour, 0, 0, 0, time.Local).Format(time.RFC3339) }
+	out := fmt.Sprintf(`[
+		{"title":"Past","start":%q,"end":%q},
+		{"title":"Now","start":%q,"end":%q},
+		{"title":"Later","start":%q,"end":%q}
+	]`, at(9), at(10), at(11), at(13), at(15), at(16))
+	p := newSection("Calendar", Recipe{Command: "true", Columns: []string{"title"}, Colors: map[string]any{"title": "red"}, Date: "start", End: "end", Days: 1}, nil).(*calendarPane)
+	p.loading, p.out = false, []byte(out)
+	p.parse(now)
+
+	lines := strings.Split(p.view(40, 10, now), "\n")
+	if want := DimmedStyle().Render("Past"); !strings.Contains(lines[1], want) {
+		t.Errorf("past event should be dimmed without its color: %q", lines[1])
+	}
+	if want := lipgloss.NewStyle().Bold(true).Render(paint("Now", "red")); !strings.Contains(lines[2], want) {
+		t.Errorf("current event should be bold and keep its color: %q", lines[2])
+	}
+	if want := paint("Later", "red"); !strings.Contains(lines[3], " "+want+" ") {
+		t.Errorf("upcoming event should be unchanged: %q", lines[3])
 	}
 }

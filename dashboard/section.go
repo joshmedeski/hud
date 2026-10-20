@@ -28,6 +28,9 @@ type Section interface {
 
 func newSection(title string, r Recipe, fs feeds) Section {
 	src := source{title: title, recipe: r, feed: fs.join(r), loading: true}
+	if r.Days > 0 {
+		return &calendarPane{source: src}
+	}
 	if len(r.Columns) > 0 {
 		var headers []string
 		if r.Headers == nil || *r.Headers {

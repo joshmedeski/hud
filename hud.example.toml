@@ -26,6 +26,14 @@ ical upcoming --exclude-calendar Birthdays -o json | jq 'map(. as $e | .when = (
 columns = ["when", "title", "calendar", "location"]
 refresh = 300
 
+[recipe.upcoming]
+command = "ical upcoming --exclude-calendar Birthdays -o json"
+days = 3
+date = "start_date"
+end = "end_date"
+columns = ["title"]
+refresh = 300
+
 [recipe.reminders]
 command = '''
 remindctl show --json | jq 'sort_by(.dueDate // "~")
@@ -52,6 +60,7 @@ sections = [
 [[page]]
 title = "Life"
 sections = [
+  [{ title = "Upcoming", recipe = "upcoming", fit = true }],
   [{ title = "Calendars", recipe = "calendar" }],
   [{ title = "Reminders", recipe = "reminders" }],
 ]
