@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/pelletier/go-toml/v2"
 )
@@ -26,12 +27,40 @@ type Recipe struct {
 	Days    int               `toml:"days"`
 	Date    string            `toml:"date"`
 	End     string            `toml:"end"`
+	Cache   any               `toml:"cache"`
+}
+
+type Cache struct {
+	Name  string   `toml:"name"`
+	TTL   string   `toml:"ttl"`
+	Watch []string `toml:"watch"`
+}
+
+func (r Recipe) cache() (*Cache, error) {
+	switch v := r.Cache.(type) {
+	case nil:
+		return nil, nil
+	case string:
+		return &Cache{TTL: v}, nil
+	case map[string]any:
+		b, err := toml.Marshal(v)
+		if err != nil {
+			return nil, err
+		}
+		var c Cache
+		if err := toml.NewDecoder(bytes.NewReader(b)).DisallowUnknownFields().Decode(&c); err != nil {
+			return nil, fmt.Errorf("cache: %w", err)
+		}
+		return &c, nil
+	}
+	return nil, fmt.Errorf("cache: want a duration like \"10m\" or { name = \"...\", ttl = \"10m\", watch = [...] }, got %v", r.Cache)
 }
 
 type Action struct {
 	Run     []string `toml:"run"`
 	Quit    bool     `toml:"quit"`
 	Confirm string   `toml:"confirm"`
+	Bust    []string `toml:"bust"`
 }
 
 func (a *Action) UnmarshalTOML(data []byte) error {
@@ -49,7 +78,7 @@ func (a *Action) UnmarshalTOML(data []byte) error {
 	if toml.Unmarshal(data, a) == nil {
 		return nil
 	}
-	return fmt.Errorf("want a list of arguments or { run = [...], quit = true, confirm = \"...\" }, got %s", bytes.TrimSpace(data))
+	return fmt.Errorf("want a list of arguments or { run = [...], quit = true, confirm = \"...\", bust = [...] }, got %s", bytes.TrimSpace(data))
 }
 
 type SectionConfig struct {
@@ -106,12 +135,44 @@ func (c Config) resolve(sc SectionConfig) (Recipe, error) {
 	if r.Days > 0 && (r.Date == "" || len(r.Columns) == 0) {
 		return r, fmt.Errorf("section %q: days needs date and columns", sc.Title)
 	}
+	if err := checkCache(r); err != nil {
+		return r, fmt.Errorf("section %q: %w", sc.Title, err)
+	}
 	for col, rule := range r.Colors {
 		if err := checkColorRule(rule); err != nil {
 			return r, fmt.Errorf("section %q: colors.%s: %w", sc.Title, col, err)
 		}
 	}
 	return r, nil
+}
+
+func checkCache(r Recipe) error {
+	c, err := r.cache()
+	if err != nil {
+		return err
+	}
+	if c != nil {
+		if c.TTL != "" {
+			if _, err := time.ParseDuration(c.TTL); err != nil {
+				return fmt.Errorf("cache.ttl: %w", err)
+			}
+		}
+		if !validCacheName(c.Name) {
+			return fmt.Errorf("cache.name %q can't contain a path", c.Name)
+		}
+	}
+	for name, action := range r.Keys {
+		for _, b := range action.Bust {
+			if b == "" || !validCacheName(b) {
+				return fmt.Errorf("keys.%s.bust: %q isn't a cache name", name, b)
+			}
+		}
+	}
+	return nil
+}
+
+func validCacheName(name string) bool {
+	return name == "" || (filepath.Base(name) == name && name != "." && name != "..")
 }
 
 func checkColorRule(rule any) error {
@@ -161,6 +222,9 @@ func (c Config) merge(sc SectionConfig) (Recipe, error) {
 	}
 	if sc.Where != nil {
 		base.Where = sc.Where
+	}
+	if sc.Cache != nil {
+		base.Cache = sc.Cache
 	}
 	base.Keys = splitKeys(base.Keys)
 	maps.Copy(base.Keys, sc.Keys)

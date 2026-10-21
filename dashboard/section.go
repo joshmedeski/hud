@@ -84,9 +84,12 @@ func (t *tabbed) titles() []string {
 }
 
 type loadedMsg struct {
-	feed *feed
-	out  []byte
-	err  error
+	feed     *feed
+	out      []byte
+	err      error
+	cachedAt time.Time
+	stale    bool
+	bust     []string
 }
 
 type refreshMsg struct{ feed *feed }
@@ -95,6 +98,7 @@ type feed struct {
 	refresh int
 	owner   *source
 	last    *loadedMsg
+	cache   *cache
 }
 
 type feeds map[string]*feed
@@ -107,6 +111,9 @@ func (fs feeds) join(r Recipe) *feed {
 			fs[r.Command] = f
 		}
 	}
+	if f.cache == nil {
+		f.cache = newCache(r)
+	}
 	if r.Refresh > 0 && (f.refresh == 0 || r.Refresh < f.refresh) {
 		f.refresh = r.Refresh
 	}
@@ -114,16 +121,22 @@ func (fs feeds) join(r Recipe) *feed {
 }
 
 type source struct {
-	title   string
-	recipe  Recipe
-	feed    *feed
-	started bool
-	loading bool
-	out     []byte
-	err     error
+	title    string
+	recipe   Recipe
+	feed     *feed
+	started  bool
+	loading  bool
+	out      []byte
+	err      error
+	cachedAt time.Time
 }
 
-func (s *source) Title() string { return s.title }
+func (s *source) Title() string {
+	if s.cachedAt.IsZero() {
+		return s.title
+	}
+	return s.title + " · " + age(time.Since(s.cachedAt))
+}
 
 func (s *source) src() *source { return s }
 
@@ -137,6 +150,10 @@ func (s *source) Init() tea.Cmd {
 	switch {
 	case s.feed.owner == nil:
 		s.feed.owner = s
+		if out, at, stale, ok := s.feed.cache.read(); ok {
+			msg := loadedMsg{feed: s.feed, out: out, cachedAt: at, stale: stale}
+			return tea.Batch(func() tea.Msg { return msg }, s.tick())
+		}
 		return tea.Batch(s.fetch(nil), s.tick())
 	case s.feed.last != nil:
 		last := *s.feed.last
@@ -145,15 +162,19 @@ func (s *source) Init() tea.Cmd {
 	return nil
 }
 
-func (s *source) fetch(before []string) tea.Cmd {
+func (s *source) fetch(before []string, busts ...string) tea.Cmd {
 	return func() tea.Msg {
 		if len(before) > 0 {
 			if err := runArgv(before); err != nil {
 				return loadedMsg{feed: s.feed, err: err}
 			}
+			bust(busts)
 		}
 		out, err := runShell(s.recipe.Command)
-		return loadedMsg{feed: s.feed, out: out, err: err}
+		if err == nil {
+			s.feed.cache.write(out)
+		}
+		return loadedMsg{feed: s.feed, out: out, err: err, bust: busts}
 	}
 }
 
@@ -171,8 +192,14 @@ func (s *source) update(msg tea.Msg) (cmd tea.Cmd, loaded bool) {
 	case loadedMsg:
 		if msg.feed == s.feed {
 			s.feed.last = &msg
-			s.loading, s.out, s.err = false, msg.out, msg.err
+			s.loading, s.out, s.err, s.cachedAt = false, msg.out, msg.err, msg.cachedAt
+			if msg.stale && s.feed.owner == s {
+				return s.fetch(nil), true
+			}
 			return nil, true
+		}
+		if s.feed.owner == s && s.feed.cache != nil && slices.Contains(msg.bust, s.feed.cache.name) {
+			return s.fetch(nil), false
 		}
 	case refreshMsg:
 		if msg.feed == s.feed && s.feed.owner == s {
@@ -291,6 +318,7 @@ type listPane struct {
 type pendingAction struct {
 	prompt string
 	argv   []string
+	bust   []string
 	quit   bool
 	no     bool
 }
@@ -464,7 +492,7 @@ func (p *listPane) runKey(action Action) tea.Cmd {
 		p.err = err
 		return nil
 	}
-	pending := pendingAction{prompt: argv[0], argv: argv[1:], quit: action.Quit}
+	pending := pendingAction{prompt: argv[0], argv: argv[1:], bust: action.Bust, quit: action.Quit}
 	if pending.prompt != "" {
 		p.pending = &pending
 		return nil
@@ -478,7 +506,7 @@ func (p *listPane) run(a pendingAction) tea.Cmd {
 		return nil
 	}
 	p.loading = true
-	return p.fetch(a.argv)
+	return p.fetch(a.argv, a.bust...)
 }
 
 func (p *listPane) handleConfirmKey(msg tea.KeyPressMsg) tea.Cmd {

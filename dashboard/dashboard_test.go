@@ -812,3 +812,118 @@ func TestConfirmPromptOverlaysTheScreen(t *testing.T) {
 		t.Errorf("dashboard should stay visible behind the dialog:\n%s", screen)
 	}
 }
+
+func TestCacheConfigForms(t *testing.T) {
+	cfg, err := LoadConfig(writeConfig(t, `
+[recipe.short]
+cache = "10m"
+
+[recipe.inline]
+cache = { name = "prs", ttl = "1h", watch = ["~/x"] }
+
+[recipe.dotted]
+cache.name = "wt"
+keys.x = { run = ["true"], bust = ["prs"] }
+`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if c, _ := cfg.Recipes["short"].cache(); c == nil || c.TTL != "10m" {
+		t.Errorf("duration shorthand not parsed: %+v", c)
+	}
+	if c, _ := cfg.Recipes["inline"].cache(); c == nil || c.Name != "prs" || c.TTL != "1h" || len(c.Watch) != 1 {
+		t.Errorf("inline cache not parsed: %+v", c)
+	}
+	dotted := cfg.Recipes["dotted"]
+	if c, _ := dotted.cache(); c == nil || c.Name != "wt" || !slices.Equal(dotted.Keys["x"].Bust, []string{"prs"}) {
+		t.Errorf("dotted cache or bust not parsed: %+v", dotted)
+	}
+	for _, bad := range []string{`cache = "soon"`, `cache = { ttl = "1h", tll = "2h" }`, `cache = 5`, `cache.name = "../x"`, `keys.x = { run = ["true"], bust = ["a/b"] }`} {
+		cfg, err := LoadConfig(writeConfig(t, "[[page]]\nsections = [[{ title = \"t\", command = \"true\", "+bad+" }]]"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := New(cfg); err == nil {
+			t.Errorf("%s should be rejected", bad)
+		}
+	}
+}
+
+func collect(cmd tea.Cmd) []tea.Msg {
+	if cmd == nil {
+		return nil
+	}
+	msg := cmd()
+	if batch, ok := msg.(tea.BatchMsg); ok {
+		var out []tea.Msg
+		for _, c := range batch {
+			out = append(out, collect(c)...)
+		}
+		return out
+	}
+	return []tea.Msg{msg}
+}
+
+func feedAll(s Section, msgs []tea.Msg) {
+	for len(msgs) > 0 {
+		next := collect(s.Update(msgs[0]))
+		msgs = append(msgs[1:], next...)
+	}
+}
+
+func TestCacheServesThenRefreshesAndBusts(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	path := cachePath("items")
+	r := Recipe{
+		Command: `echo '[{"Name":"live"}]'`,
+		Columns: []string{"Name"},
+		Cache:   map[string]any{"name": "items", "ttl": "1h"},
+	}
+	os.MkdirAll(filepath.Dir(path), 0o755)
+	os.WriteFile(path, []byte(`[{"Name":"cached"}]`), 0o644)
+
+	fresh := newSection("Items", r, feeds{}).(*listPane)
+	feedAll(fresh, collect(fresh.Init()))
+	if fresh.cells[0][0] != "cached" || !strings.HasPrefix(fresh.Title(), "Items · ") {
+		t.Errorf("fresh cache should be shown without running: %v %q", fresh.cells, fresh.Title())
+	}
+
+	old := time.Now().Add(-2 * time.Hour)
+	os.Chtimes(path, old, old)
+	stale := newSection("Items", r, feeds{}).(*listPane)
+	feedAll(stale, collect(stale.Init()))
+	if stale.cells[0][0] != "live" || stale.Title() != "Items" {
+		t.Errorf("stale cache should be refreshed: %v %q", stale.cells, stale.Title())
+	}
+	if b, _ := os.ReadFile(path); !strings.Contains(string(b), "live") {
+		t.Errorf("refresh should rewrite the cache, got %s", b)
+	}
+
+	r.Keys = map[string]Action{"x": {Run: []string{"true"}, Bust: []string{"items"}}}
+	r.Cache = map[string]any{"name": "other"}
+	actor := newSection("Actor", r, feeds{}).(*listPane)
+	feedAll(actor, collect(actor.Init()))
+	msgs := collect(actor.Update(key("x")))
+	if _, err := os.Stat(path); !os.IsNotExist(err) {
+		t.Errorf("bust should delete the cache entry, stat err %v", err)
+	}
+	if len(collect(stale.Update(msgs[0]))) != 1 {
+		t.Error("a pane whose cache was busted should reload")
+	}
+}
+
+func TestWatchedFileMakesCacheStale(t *testing.T) {
+	t.Setenv("XDG_CACHE_HOME", t.TempDir())
+	watched := filepath.Join(t.TempDir(), "sesh.toml")
+	os.WriteFile(watched, nil, 0o644)
+	c := &cache{name: "w", watch: []string{watched}}
+	c.write([]byte("x"))
+	if _, _, stale, ok := c.read(); !ok || stale {
+		t.Fatalf("cache newer than watched file should be fresh: ok=%v stale=%v", ok, stale)
+	}
+	later := time.Now().Add(time.Minute)
+	os.Chtimes(watched, later, later)
+	if _, _, stale, _ := c.read(); !stale {
+		t.Error("watched file newer than cache should make it stale")
+	}
+}

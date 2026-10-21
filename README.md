@@ -65,6 +65,7 @@ A recipe is a `[recipe.<name>]` table:
 | `days`    | Show rows as a calendar of the next N days that have entries. See [Calendar](#calendar).  |
 | `date`    | JSON key holding each row's date, for `days`.                                             |
 | `end`     | JSON key holding each row's end date, for `days`.                                         |
+| `cache`   | Keep the output on disk and show it right away next time. See [Cache](#cache).            |
 
 ### Keys
 
@@ -84,6 +85,13 @@ state until the command finishes:
 
 ```toml
 keys.x = { run = ["git", "worktree", "remove", "{{.path}}"], confirm = "Delete worktree {{.title}}?" }
+```
+
+Add `bust` to delete [cache](#cache) entries by name after the command runs.
+Any open pane using one of those entries reloads:
+
+```toml
+keys.x = { run = ["git", "worktree", "remove", "{{.path}}"], bust = ["worktrees", "prs"] }
 ```
 
 A key does nothing on a row that is missing a field its templates use, so
@@ -208,14 +216,66 @@ show no time.
 With `end` set, an event happening now is bold, and events that have ended are
 gray. Without it, events turn gray once they start.
 
+### Cache
+
+hud starts fresh every time it opens, so slow commands make you wait each
+time. Set `cache` to save a command's output to disk. The next time the pane
+opens, it shows the saved output right away and only runs the command if the
+output has gone stale:
+
+```toml
+[recipe.prs]
+command = "gh pr list --json number,title,state"
+columns = ["number", "title", "state"]
+cache = "10m"
+```
+
+`cache = "10m"` is short for `cache = { ttl = "10m" }`. The full form takes:
+
+| Field   | Meaning                                                                       |
+| ------- | ----------------------------------------------------------------------------- |
+| `ttl`   | Run the command again once the saved output is older than this (`90s`, `1h`). |
+| `watch` | Files that make the saved output stale when they change. `~/` is expanded.    |
+| `name`  | Name of the cache entry, for `bust` and for finding its file.                 |
+
+Commands that read local files can use `watch` instead of a timer. They stay
+cached until a file they depend on changes:
+
+```toml
+[recipe.sesh]
+command = "sesh list --json"
+cache = { name = "sesh", watch = ["~/.config/sesh/sesh.toml"] }
+```
+
+With both `ttl` and `watch`, whichever goes stale first wins. With neither,
+the saved output is used until you press `r` or a key [busts](#keys) it.
+While a pane shows saved output, its title shows how old the output is
+(`Sessions · 4m`). `r` and `R` always run the command. A failed run leaves
+the saved output alone.
+
+Each entry is a plain file holding the command's raw output, in
+`$XDG_CACHE_HOME/hud/` (or `~/.cache/hud/`). Its name is `name`, or a short
+hash of the command when `name` isn't set. Its modification time is when it
+was saved. You can manage the cache with ordinary tools:
+
+```sh
+ls -lt ~/.cache/hud                       # what's cached, newest first
+rm ~/.cache/hud/prs                       # bust an entry
+touch ~/.cache/hud/prs                    # mark it fresh
+gh pr list --json ... > ~/.cache/hud/prs  # warm it from a script or cron job
+```
+
+A named entry isn't tied to its command. If you change the command, `rm` the
+entry so the old output isn't shown.
+
 ## Pages and sections
 
 A section has a `title`, an optional `recipe` to start from, and any recipe
 field to override. This lets several panes share one recipe. When a section
 overrides a field:
 
-- `command`, `columns`, `colors`, `labels`, `headers`, `where` and `refresh`
-  replace the recipe's value.
+- `command`, `columns`, `colors`, `labels`, `headers`, `where`, `refresh` and
+  `cache` replace the recipe's value.
 - `keys` are merged with the recipe's keys. A key set in both uses the
   section's command.
 - `fit` is on if either the recipe or the section sets it.

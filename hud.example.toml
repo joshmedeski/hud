@@ -9,6 +9,7 @@ command = "sesh worktree list -r Nutiliti/nutiliti --json"
 columns = ["Number", "State", "Title"]
 keys.enter = { run = ["sesh", "worktree", "connect", "{{.Number}}", "-r", "Nutiliti/nutiliti"], quit = true }
 keys.o = ["gh", "browse", "{{.Number}}", "-R", "Nutiliti/nutiliti"]
+cache = "10m"
 colors = { State = { OPEN = "green", CLOSED = "red", MERGED = "magenta" } }
 
 [recipe.sesh-worktrees]
