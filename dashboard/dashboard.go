@@ -192,7 +192,7 @@ func (m Model) handleKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 		m.quit = true
 		return m, tea.Quit
 	}
-	if f, ok := m.focused().(*listPane); ok && f.Filtering() {
+	if f, ok := m.focused().(*listPane); ok && (f.Filtering() || f.ConfirmPrompt() != "") {
 		return m.routeKey(msg)
 	}
 	if m.showHelp {
@@ -480,9 +480,9 @@ func (m Model) View() tea.View {
 		parts = append(parts, renderHeader(m.page, m.width, titles))
 	}
 
-	filtering, query := false, ""
+	filtering, query, prompt, no := false, "", "", false
 	if l, ok := m.focused().(*listPane); ok {
-		filtering, query = l.Filtering(), l.FilterQuery()
+		filtering, query, prompt, no = l.Filtering(), l.FilterQuery(), l.ConfirmPrompt(), l.ConfirmNo()
 	}
 	footer := renderFooter(m.width, !m.hidePages, filtering, query)
 
@@ -497,7 +497,11 @@ func (m Model) View() tea.View {
 		content = m.viewPage()
 	}
 
-	v := tea.NewView(lipgloss.JoinVertical(lipgloss.Top, append(parts, content, footer)...))
+	screen := lipgloss.JoinVertical(lipgloss.Top, append(parts, content, footer)...)
+	if prompt != "" {
+		screen = overlay(screen, renderConfirm(prompt, no, m.width))
+	}
+	v := tea.NewView(screen)
 	v.AltScreen = true
 	v.MouseMode = tea.MouseModeCellMotion
 	return v

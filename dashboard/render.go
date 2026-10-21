@@ -183,6 +183,32 @@ var footerBinds = []keybind{
 	{"q", "quit"},
 }
 
+func renderConfirm(prompt string, no bool, width int) string {
+	question := TextStyle().Bold(true).Width(min(lipgloss.Width(prompt), max(width-10, 1))).Render(prompt)
+	buttons := button("Yes", !no) + "  " + button("No", no)
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorAccent).
+		Padding(1, 3).
+		Render(lipgloss.JoinVertical(lipgloss.Center, question, "", buttons))
+}
+
+func button(label string, selected bool) string {
+	style := lipgloss.NewStyle().Padding(0, 2).Foreground(colorText).Background(colorDimmed)
+	if selected {
+		style = style.Foreground(colorHighlight).Background(colorAccent).Bold(true)
+	}
+	return style.Render(label)
+}
+
+func overlay(base, top string) string {
+	width, height := lipgloss.Width(base), lipgloss.Height(base)
+	x := max((width-lipgloss.Width(top))/2, 0)
+	y := max((height-lipgloss.Height(top))/2, 0)
+	layers := lipgloss.NewCompositor(lipgloss.NewLayer(base), lipgloss.NewLayer(top).X(x).Y(y).Z(1))
+	return lipgloss.NewCanvas(width, height).Compose(layers).Render()
+}
+
 func renderFooter(width int, pages, filtering bool, query string) string {
 	if filtering {
 		line := strings.Join([]string{

@@ -29,8 +29,9 @@ type Recipe struct {
 }
 
 type Action struct {
-	Run  []string `toml:"run"`
-	Quit bool     `toml:"quit"`
+	Run     []string `toml:"run"`
+	Quit    bool     `toml:"quit"`
+	Confirm string   `toml:"confirm"`
 }
 
 func (a *Action) UnmarshalTOML(data []byte) error {
@@ -48,7 +49,7 @@ func (a *Action) UnmarshalTOML(data []byte) error {
 	if toml.Unmarshal(data, a) == nil {
 		return nil
 	}
-	return fmt.Errorf("want a list of arguments or { run = [...], quit = true }, got %s", bytes.TrimSpace(data))
+	return fmt.Errorf("want a list of arguments or { run = [...], quit = true, confirm = \"...\" }, got %s", bytes.TrimSpace(data))
 }
 
 type SectionConfig struct {

@@ -285,6 +285,14 @@ type listPane struct {
 	filtering                  bool
 	query                      string
 	chosen                     []string
+	pending                    *pendingAction
+}
+
+type pendingAction struct {
+	prompt string
+	argv   []string
+	quit   bool
+	no     bool
 }
 
 func (p *listPane) Update(msg tea.Msg) tea.Cmd {
@@ -366,6 +374,9 @@ func cellStyle(rule any, cell string, item map[string]any) string {
 }
 
 func (p *listPane) handleKey(msg tea.KeyPressMsg) tea.Cmd {
+	if p.pending != nil {
+		return p.handleConfirmKey(msg)
+	}
 	if p.filtering {
 		return p.handleFilterKey(msg)
 	}
@@ -424,6 +435,15 @@ func (p *listPane) Filtering() bool     { return p.filtering }
 func (p *listPane) FilterQuery() string { return p.query }
 func (p *listPane) Chosen() []string    { return p.chosen }
 
+func (p *listPane) ConfirmPrompt() string {
+	if p.pending == nil {
+		return ""
+	}
+	return p.pending.prompt
+}
+
+func (p *listPane) ConfirmNo() bool { return p.pending != nil && p.pending.no }
+
 func (p *listPane) hovered() (map[string]any, bool) {
 	if len(p.visible) == 0 {
 		return nil, false
@@ -436,16 +456,52 @@ func (p *listPane) runKey(action Action) tea.Cmd {
 	if !ok || len(action.Run) == 0 {
 		return nil
 	}
-	argv, err := expand(action.Run, item)
+	argv, err := expand(append([]string{action.Confirm}, action.Run...), item)
+	if isMissingKey(err) {
+		return nil
+	}
 	if err != nil {
 		p.err = err
 		return nil
 	}
-	if action.Quit {
-		p.chosen = argv
+	pending := pendingAction{prompt: argv[0], argv: argv[1:], quit: action.Quit}
+	if pending.prompt != "" {
+		p.pending = &pending
 		return nil
 	}
-	return p.fetch(argv)
+	return p.run(pending)
+}
+
+func (p *listPane) run(a pendingAction) tea.Cmd {
+	if a.quit {
+		p.chosen = a.argv
+		return nil
+	}
+	p.loading = true
+	return p.fetch(a.argv)
+}
+
+func (p *listPane) handleConfirmKey(msg tea.KeyPressMsg) tea.Cmd {
+	pending := *p.pending
+	switch msg.String() {
+	case "h", "l", "left", "right", "tab", "shift+tab":
+		p.pending.no = !p.pending.no
+		return nil
+	case "enter":
+		if pending.no {
+			break
+		}
+		fallthrough
+	case "y":
+		p.pending = nil
+		return p.run(pending)
+	}
+	p.pending = nil
+	return nil
+}
+
+func isMissingKey(err error) bool {
+	return err != nil && strings.Contains(err.Error(), "map has no entry for key")
 }
 
 func (p *listPane) applyFilter() {

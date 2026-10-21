@@ -737,3 +737,78 @@ func TestCalendarBoldsCurrentAndDimsPastEvents(t *testing.T) {
 		t.Errorf("upcoming event should be unchanged: %q", lines[3])
 	}
 }
+
+func TestConfirmKeyAsksBeforeRunning(t *testing.T) {
+	p := loadedList(t, Recipe{
+		Command: `echo '[{"Name":"a","Path":"/tmp/a"},{"Name":"b"}]'`,
+		Columns: []string{"Name"},
+		Keys:    map[string]Action{"x": {Run: []string{"rm", "{{.Path}}"}, Confirm: "Delete {{.Name}}?"}},
+	})
+	if cmd := p.Update(key("x")); cmd != nil || p.ConfirmPrompt() != "Delete a?" {
+		t.Fatalf("x should ask first, prompt = %q", p.ConfirmPrompt())
+	}
+	if cmd := p.Update(key("n")); cmd != nil || p.ConfirmPrompt() != "" {
+		t.Error("n should cancel without running")
+	}
+	p.Update(key("x"))
+	if cmd := p.Update(key("y")); cmd == nil || !p.loading {
+		t.Error("y should run the action and show loading")
+	}
+
+	p.loading = false
+	p.Update(key("x"))
+	p.Update(key("l"))
+	if !p.ConfirmNo() {
+		t.Fatal("l should select No")
+	}
+	if cmd := p.Update(key("enter")); cmd != nil || p.ConfirmPrompt() != "" {
+		t.Error("enter on No should cancel without running")
+	}
+	p.Update(key("x"))
+	p.Update(key("tab"))
+	p.Update(key("h"))
+	if cmd := p.Update(key("enter")); cmd == nil {
+		t.Error("enter on Yes should run the action")
+	}
+
+	p.loading = false
+	p.Update(key("j"))
+	if cmd := p.Update(key("x")); cmd != nil || p.ConfirmPrompt() != "" || p.err != nil {
+		t.Error("a row missing a templated field should skip the key")
+	}
+}
+
+func TestConfirmPromptOverlaysTheScreen(t *testing.T) {
+	m, err := New(Config{Pages: []PageConfig{{Sections: [][]SectionConfig{{{
+		Title: "Worktrees",
+		Recipe: Recipe{
+			Command: `echo '[{"Name":"feature-branch"},{"Name":"main"}]'`,
+			Columns: []string{"Name"},
+			Keys:    map[string]Action{"x": {Run: []string{"rm", "{{.Name}}"}, Confirm: "Delete {{.Name}}?"}},
+		},
+	}}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := m.allSections()[0].(*listPane)
+	p.Update(p.fetch(nil)())
+	next, _ := m.Update(tea.WindowSizeMsg{Width: 50, Height: 14})
+	m = next.(Model)
+	before := m.View().Content
+
+	next, _ = m.Update(key("x"))
+	m = next.(Model)
+	screen := ansi.Strip(m.View().Content)
+	if testing.Verbose() {
+		t.Log("\n" + screen)
+	}
+	if !strings.Contains(screen, "╭") || !strings.Contains(screen, "Delete feature-branch?") || !strings.Contains(screen, "Yes      No") {
+		t.Errorf("prompt should show in a dialog:\n%s", screen)
+	}
+	if lipgloss.Height(screen) != lipgloss.Height(before) || lipgloss.Width(screen) != lipgloss.Width(before) {
+		t.Errorf("dialog should not change the screen size:\n%s", screen)
+	}
+	if !strings.Contains(screen, "Worktrees") {
+		t.Errorf("dashboard should stay visible behind the dialog:\n%s", screen)
+	}
+}

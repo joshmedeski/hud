@@ -77,6 +77,18 @@ keys.enter = { run = ["sesh", "connect", "{{.Name}}"], quit = true }
 keys."ctrl+d" = ["tmux", "kill-session", "-t", "{{.Name}}"]
 ```
 
+Add `confirm` to ask in a dialog before running. Move between its Yes and No
+buttons with `h` / `l`, `←` / `→` or `tab`, and press `enter` to choose. `y` runs
+the command right away, and any other key cancels. The pane shows a loading
+state until the command finishes:
+
+```toml
+keys.x = { run = ["git", "worktree", "remove", "{{.path}}"], confirm = "Delete worktree {{.title}}?" }
+```
+
+A key does nothing on a row that is missing a field its templates use, so
+`keys.x` above is skipped on rows without a `path`.
+
 To bind several keys to one command, separate them with spaces:
 `keys."enter o" = [...]`.
 
