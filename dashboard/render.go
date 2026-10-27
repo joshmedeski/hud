@@ -259,6 +259,8 @@ func renderHelp(width, height int, pages bool, extra map[string]Action) string {
 		{"ctrl+j / ctrl+k", "focus pane below / above"},
 		{"1-9", "focus pane"},
 		{"click", "focus pane and select row"},
+		{"scroll", "move within the table under the mouse"},
+		{"double click", "run the pane's doubleclick key, or enter"},
 		{"?", "close help"},
 		{"q / esc", "quit"},
 	}...)

@@ -570,12 +570,13 @@ func (p *listPane) headerRows() int {
 	return 1
 }
 
-func (p *listPane) ClickAt(row int) {
+func (p *listPane) ClickAt(row int) bool {
 	row -= p.headerRows()
-	if len(p.visible) == 0 || row < 0 {
-		return
+	if len(p.visible) == 0 || row < 0 || p.offset+row >= len(p.visible) {
+		return false
 	}
-	p.cursor = min(p.offset+row, len(p.visible)-1)
+	p.cursor = p.offset + row
+	return true
 }
 
 func (p *listPane) ContentHeight() int {

@@ -100,6 +100,9 @@ A key does nothing on a row that is missing a field its templates use, so
 To bind several keys to one command, separate them with spaces:
 `keys."enter o" = [...]`.
 
+Double-clicking a row runs `keys.doubleclick`, or `keys.enter` when the pane
+has no `doubleclick` key.
+
 Commands are lists of arguments, not shell strings. Each argument is a Go
 template that gets the selected row, so `{{.Name}}` becomes that row's `Name`
 value. A value with spaces stays a single argument, so no quoting is needed.
@@ -382,6 +385,8 @@ can sit inside a `stack`, but can't contain a stack or more tabs.
 | `R`                                   | reload every pane on the page     |
 | `[` / `]`                             | previous / next tab in the pane   |
 | click                                 | focus pane and select row         |
+| scroll                                | move within the table under mouse |
+| double click                          | run `doubleclick`, else `enter`   |
 | `?`                                   | help, including the pane's `keys` |
 | `q` / `esc` / `ctrl+c`                | quit                              |
 

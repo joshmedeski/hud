@@ -3,6 +3,7 @@ package dashboard
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
@@ -27,11 +28,19 @@ type Model struct {
 	hidePages     bool
 	quit          bool
 	action        []string
+	lastClick     click
 
 	contentHeight int
 	rowWidths     [][]int
 	rowHeights    []int
 }
+
+type click struct {
+	at        time.Time
+	pane, row int
+}
+
+const doubleClickWindow = 400 * time.Millisecond
 
 func New(cfg Config) (Model, error) {
 	var pages []page
@@ -178,7 +187,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyPressMsg:
 		return m.handleKey(msg)
 	case tea.MouseClickMsg:
-		return m.handleMouseClick(msg), nil
+		return m.handleMouseClick(msg)
+	case tea.MouseWheelMsg:
+		return m.handleMouseWheel(msg), nil
 	}
 	var cmds []tea.Cmd
 	for _, sec := range m.allSections() {
@@ -259,7 +270,10 @@ func (m Model) routeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	if sec == nil {
 		return m, nil
 	}
-	cmd := sec.Update(msg)
+	return m.finish(sec, sec.Update(msg))
+}
+
+func (m Model) finish(sec Section, cmd tea.Cmd) (tea.Model, tea.Cmd) {
 	if l, ok := sec.(*listPane); ok && l.Chosen() != nil {
 		m.action = l.Chosen()
 		return m, tea.Quit
@@ -267,18 +281,65 @@ func (m Model) routeKey(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
+func (m Model) handleMouseClick(msg tea.MouseClickMsg) (tea.Model, tea.Cmd) {
 	e := msg.Mouse()
 	if m.showHelp || e.Button != tea.MouseLeft {
+		return m, nil
+	}
+	idx, sec, line, ok := m.hit(e.X, e.Y)
+	if !ok {
+		return m, nil
+	}
+	m.focus = idx
+	l, ok := sec.(*listPane)
+	if !ok || !l.ClickAt(line) {
+		m.lastClick = click{}
+		return m, nil
+	}
+	now := time.Now()
+	prev := m.lastClick
+	m.lastClick = click{at: now, pane: idx, row: l.cursor}
+	if prev.pane != idx || prev.row != l.cursor || now.Sub(prev.at) > doubleClickWindow {
+		return m, nil
+	}
+	m.lastClick = click{}
+	action, ok := l.recipe.Keys["doubleclick"]
+	if !ok {
+		action, ok = l.recipe.Keys["enter"]
+	}
+	if !ok {
+		return m, nil
+	}
+	return m.finish(l, l.runKey(action))
+}
+
+func (m Model) handleMouseWheel(msg tea.MouseWheelMsg) Model {
+	e := msg.Mouse()
+	if m.showHelp {
 		return m
 	}
-	cy := e.Y - m.headerHeight()
+	_, sec, _, ok := m.hit(e.X, e.Y)
+	l, isList := sec.(*listPane)
+	if !ok || !isList {
+		return m
+	}
+	switch e.Button {
+	case tea.MouseWheelDown:
+		l.cursorDown()
+	case tea.MouseWheelUp:
+		l.cursorUp()
+	}
+	return m
+}
+
+func (m Model) hit(x, y int) (idx int, sec Section, line int, ok bool) {
+	cy := y - m.headerHeight()
 	top, base := 0, 0
 	for r, cols := range m.rows() {
 		if cy >= top && cy < top+m.rowHeights[r] {
-			c := paneCol(e.X, m.rowWidths[r])
+			c := paneCol(x, m.rowWidths[r])
 			if c < 0 {
-				return m
+				return 0, nil, 0, false
 			}
 			for _, prev := range cols[:c] {
 				base += len(prev)
@@ -286,20 +347,16 @@ func (m Model) handleMouseClick(msg tea.MouseClickMsg) Model {
 			line, start := cy-top, 0
 			for s, h := range stackHeights(m.rowHeights[r], cols[c]) {
 				if line < start+h+2 || s == len(cols[c])-1 {
-					m.focus = base + s
-					if l, ok := current(cols[c][s]).(*listPane); ok {
-						l.ClickAt(line - start - 1)
-					}
-					return m
+					return base + s, current(cols[c][s]), line - start - 1, true
 				}
 				start += h + 2
 			}
-			return m
+			return 0, nil, 0, false
 		}
 		top += m.rowHeights[r]
 		base += paneTotal(cols)
 	}
-	return m
+	return 0, nil, 0, false
 }
 
 func stackHeights(height int, panes column) []int {

@@ -460,8 +460,8 @@ sections = [
 	}
 
 	for line, want := range map[int]string{2: "Top", 5: "Bottom", 7: "Bottom", 12: "Wide"} {
-		next := m.handleMouseClick(tea.MouseClickMsg{X: 3, Y: line + 2, Button: tea.MouseLeft})
-		if got := next.focused().Title(); got != want {
+		next, _ := m.handleMouseClick(tea.MouseClickMsg{X: 3, Y: line + 2, Button: tea.MouseLeft})
+		if got := next.(Model).focused().Title(); got != want {
 			t.Errorf("click on line %d focused %q, want %q", line, got, want)
 		}
 	}
@@ -925,5 +925,67 @@ func TestWatchedFileMakesCacheStale(t *testing.T) {
 	os.Chtimes(watched, later, later)
 	if _, _, stale, _ := c.read(); !stale {
 		t.Error("watched file newer than cache should make it stale")
+	}
+}
+
+func TestMouseWheelMovesListUnderPointer(t *testing.T) {
+	list := SectionConfig{Recipe: Recipe{Command: `echo '[{"Name":"a"},{"Name":"b"},{"Name":"c"}]'`, Columns: []string{"Name"}}}
+	m, err := New(Config{Pages: []PageConfig{{Sections: [][]SectionConfig{{{}, list}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, sec, _, _ := m.hit(50, 4)
+	p := sec.(*listPane)
+	p.Update(p.fetch(nil)())
+	wheel := func(b tea.MouseButton) {
+		next, _ := m.Update(tea.MouseWheelMsg{X: 50, Y: 4, Button: b})
+		m = next.(Model)
+	}
+	wheel(tea.MouseWheelDown)
+	wheel(tea.MouseWheelDown)
+	wheel(tea.MouseWheelDown)
+	if p.cursor != 2 {
+		t.Errorf("cursor = %d after three scrolls down, want 2", p.cursor)
+	}
+	wheel(tea.MouseWheelUp)
+	if p.cursor != 1 || m.focus != 0 {
+		t.Errorf("cursor = %d focus = %d after scroll up, want 1 and 0", p.cursor, m.focus)
+	}
+}
+
+func TestDoubleClickRunsDoubleclickKey(t *testing.T) {
+	list := SectionConfig{Recipe: Recipe{
+		Command: `echo '[{"Name":"a"},{"Name":"b"}]'`,
+		Columns: []string{"Name"},
+		Keys:    map[string]Action{"doubleclick": {Run: []string{"open", "{{.Name}}"}, Quit: true}},
+	}}
+	m, err := New(Config{Pages: []PageConfig{{Sections: [][]SectionConfig{{list}}}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := m.focused().(*listPane)
+	p.Update(p.fetch(nil)())
+	click := func(y int) {
+		next, _ := m.Update(tea.MouseClickMsg{X: 5, Y: y, Button: tea.MouseLeft})
+		m = next.(Model)
+	}
+	click(4)
+	click(5)
+	if m.Action() != nil {
+		t.Fatalf("clicks on different rows ran %q", m.Action())
+	}
+	click(5)
+	if got := strings.Join(m.Action(), " "); got != "open b" {
+		t.Errorf("double click ran %q, want %q", got, "open b")
+	}
+
+	list.Keys = map[string]Action{"enter": {Run: []string{"enter", "{{.Name}}"}, Quit: true}}
+	m, _ = New(Config{Pages: []PageConfig{{Sections: [][]SectionConfig{{list}}}}})
+	p = m.focused().(*listPane)
+	p.Update(p.fetch(nil)())
+	click(4)
+	click(4)
+	if got := strings.Join(m.Action(), " "); got != "enter a" {
+		t.Errorf("double click without a doubleclick key ran %q, want %q", got, "enter a")
 	}
 }
