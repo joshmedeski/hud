@@ -95,6 +95,7 @@ type PageConfig struct {
 }
 
 type Config struct {
+	Import  []string          `toml:"import"`
 	Recipes map[string]Recipe `toml:"recipe"`
 	Pages   []PageConfig      `toml:"page"`
 }
@@ -112,6 +113,59 @@ func LoadConfig(path string) (Config, error) {
 	if path == "" {
 		path = DefaultConfigPath()
 	}
+	return loadConfig(path, map[string]bool{})
+}
+
+func loadConfig(path string, seen map[string]bool) (Config, error) {
+	real, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return Config{}, err
+	}
+	abs, err := filepath.Abs(real)
+	if err != nil {
+		return Config{}, err
+	}
+	if seen[abs] {
+		return Config{}, nil
+	}
+	seen[abs] = true
+	own, err := decodeConfig(path)
+	if err != nil {
+		return own, err
+	}
+	cfg := Config{Recipes: map[string]Recipe{}}
+	origin := map[string]string{}
+	add := func(file string, c Config) error {
+		for name, r := range c.Recipes {
+			if prev, ok := origin[name]; ok {
+				return fmt.Errorf("recipe %q is defined in both %s and %s", name, prev, file)
+			}
+			origin[name] = file
+			cfg.Recipes[name] = r
+		}
+		cfg.Pages = append(cfg.Pages, c.Pages...)
+		return nil
+	}
+	for _, imp := range own.Import {
+		file := expandHome(imp)
+		if !filepath.IsAbs(file) {
+			file = filepath.Join(filepath.Dir(abs), file)
+		}
+		sub, err := loadConfig(file, seen)
+		if err != nil {
+			return cfg, err
+		}
+		if err := add(file, sub); err != nil {
+			return cfg, fmt.Errorf("%s: %w", path, err)
+		}
+	}
+	if err := add(path, own); err != nil {
+		return cfg, fmt.Errorf("%s: %w", path, err)
+	}
+	return cfg, nil
+}
+
+func decodeConfig(path string) (Config, error) {
 	var cfg Config
 	b, err := os.ReadFile(path)
 	if err != nil {

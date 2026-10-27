@@ -47,6 +47,17 @@ Use `hud -C path/to/hud.toml` to load a different file.
 Use `hud --page "Nutiliti"` (or `-p`) to open on a page by its title.
 Add `--no-pages` to hide the page tabs and turn off `tab` / `shift+tab`.
 
+Split a config across files with `import`, a list of paths relative to the
+file that imports them (or absolute, or starting with `~/`):
+
+```toml
+import = ["recipes.toml", "pages/work.toml"]
+```
+
+Imported files can import other files too, and each file loads once. Their
+recipes and pages are added before the importing file's own, in the order
+listed, and a recipe name defined in two files is an error.
+
 ## Recipes
 
 A recipe is a `[recipe.<name>]` table:

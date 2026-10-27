@@ -102,6 +102,70 @@ enter = ["open", "{{.Name}}"]`)); err == nil || !strings.Contains(err.Error(), "
 	}
 }
 
+func TestLoadConfigImports(t *testing.T) {
+	dir := t.TempDir()
+	write := func(name, body string) string {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return path
+	}
+	write("recipes/sesh.toml", `[recipe.sesh]
+command = "sesh list --json"`)
+	write("pages/work.toml", `import = ["../recipes/sesh.toml"]
+[[page]]
+title = "Work"
+sections = [[{ recipe = "sesh" }]]`)
+	main := write("hud.toml", `import = ["pages/work.toml"]
+[[page]]
+title = "Home"
+sections = [[{ recipe = "sesh" }]]`)
+
+	cfg, err := LoadConfig(main)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Recipes["sesh"].Command != "sesh list --json" {
+		t.Errorf("imported recipe = %+v", cfg.Recipes["sesh"])
+	}
+	var titles []string
+	for _, p := range cfg.Pages {
+		titles = append(titles, p.Title)
+	}
+	if got := strings.Join(titles, ","); got != "Work,Home" {
+		t.Errorf("pages = %s, want imported pages first", got)
+	}
+	if _, err := New(cfg); err != nil {
+		t.Error(err)
+	}
+
+	dup := write("dup.toml", `import = ["recipes/sesh.toml"]
+[recipe.sesh]
+command = "other"`)
+	if _, err := LoadConfig(dup); err == nil || !strings.Contains(err.Error(), "both") {
+		t.Errorf("duplicate recipe should error, got %v", err)
+	}
+	shared := write("shared.toml", `import = ["pages/work.toml", "recipes/sesh.toml", "shared.toml"]`)
+	if cfg, err := LoadConfig(shared); err != nil || len(cfg.Pages) != 1 {
+		t.Errorf("a file imported twice or by itself should load once, got %d pages, %v", len(cfg.Pages), err)
+	}
+	link := filepath.Join(t.TempDir(), "hud.toml")
+	if err := os.Symlink(main, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadConfig(link); err != nil {
+		t.Errorf("imports from a symlinked config should resolve next to its target, got %v", err)
+	}
+	missing := write("missing.toml", `import = ["nope.toml"]`)
+	if _, err := LoadConfig(missing); err == nil {
+		t.Error("missing import should error")
+	}
+}
+
 func loadedList(t *testing.T, r Recipe) *listPane {
 	t.Helper()
 	p := newSection("test", r, nil).(*listPane)
